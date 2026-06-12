@@ -1,8 +1,4 @@
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/1a14c3e3-32c3-4474-a081-ce737bfc439a" alt="MFS logo" width="140" />
-</p>
-
-<h1 align="center">MFS — Multi-source File-like Search</h1>
+<h1 align="center"><img src="https://github.com/user-attachments/assets/1a14c3e3-32c3-4474-a081-ce737bfc439a" alt="MFS logo" width="48" align="absmiddle" /> MFS — Multi-source File-like Search</h1>
 
 <p align="center">
   <strong>A context harness for AI agents — and for building them.</strong><br/>
@@ -18,6 +14,10 @@
 </p>
 
 ---
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/42c4e26c-c26a-463f-bd97-c5bb2d38eabe" alt="MFS multi-source analysis demo" width="880" />
+</p>
 
 Modern AI agents need a place to keep their **context**: codebases,
 memory, skills, knowledge, work messages, documents, databases. Most
@@ -35,6 +35,42 @@ already use work everywhere: `ls`, `cat`, `tree`, `grep`, `head`,
 <p align="center">
   <img src="https://github.com/user-attachments/assets/1430d872-4184-4fb3-9168-a0b715dc621a" alt="MFS architecture: clients (CLI, SDKs, agent skills) talk to mfs-server, which unifies many context sources into one searchable namespace" width="880" />
 </p>
+
+## Install the agent skills
+
+Install the MFS skill packs before asking an agent to search, browse,
+or ingest through MFS:
+
+```bash
+# Global: available in all projects, all supported agents
+npx skills add zilliztech/mfs --all -g
+
+# Project-level: current project only, all supported agents
+npx skills add zilliztech/mfs --all
+```
+
+<details>
+<summary>Install to a specific agent</summary>
+
+```bash
+npx skills add zilliztech/mfs -a claude-code -g
+npx skills add zilliztech/mfs -a codex -g
+```
+
+</details>
+
+<details>
+<summary>Check for updates</summary>
+
+```bash
+npx skills check
+npx skills update
+```
+
+For project-level installs, re-run the `npx skills add` command to
+update.
+
+</details>
 
 ## 🚀 Use it
 
@@ -364,8 +400,8 @@ of it — and you skip writing a connector per source.
 Three ways to wire MFS into your agent:
 
 - **🧩 Skill packs.** Drop [`skills/mfs-find`](skills/mfs-find/SKILL.md)
-  and [`skills/mfs-ingest`](skills/mfs-ingest/SKILL.md) into Claude
-  Code, Codex CLI, OpenCode, or your own agent runtime — the agent
+  and [`skills/mfs-ingest`](skills/mfs-ingest/SKILL.md) into your
+  coding agent runtime, and the agent
   inherits the whole search-and-browse loop with no custom
   integration code.
 - **📦 SDKs.** Generated Python and TypeScript clients under `sdks/`
