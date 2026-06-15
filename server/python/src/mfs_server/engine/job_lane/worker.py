@@ -3,9 +3,9 @@
 Each worker pulls a ready (job_id, dir_uri) from the queue, folds its children content
 (child file excerpts + already-computed sub-dir summaries), calls the summary LLM, writes
 the result back into the dir node, decrements the parent's pending (pushing it when it hits
-zero), and emits a directory_summary Chunk into the shared chunks_q. Children content is read
-through tx_cache.get_or_compute (the §3.4 compute lock) for image/document-convert, and via a
-plain read for code / markdown.
+zero), and emits a directory_summary Chunk into the shared chunks_q. A child document reuses
+the Object Lane's converted_md from the artifact cache (currency token); a child image goes
+through the VLM client (transformation-cache memoized); code / markdown are read directly.
 """
 
 from __future__ import annotations
@@ -17,10 +17,10 @@ from ..producers.base import read_bytes, read_text
 
 
 async def _child_text(coord, job_id: str, child_uri: str, okind: str) -> str:
-    """Content excerpt for one child file, capped at per_file_max_kb. image/document-convert
-    reuse a hash already produced by the Map subsystem — the single-flight + memoization lives
-    inside the vlm / converter clients (tx_cache.get_or_compute, §3.4) — while code / markdown
-    are read directly."""
+    """Content excerpt for one child file, capped at per_file_max_kb. A document reuses the
+    Object Lane's converted_md artifact when the currency token matches (else it is converted
+    once and cached for both lanes); an image goes through the VLM client (transformation-cache
+    memoized); code / markdown are read directly."""
     plugin = coord.job_plugins.get(job_id)
     if plugin is None:
         return ""
@@ -34,12 +34,28 @@ async def _child_text(coord, job_id: str, child_uri: str, okind: str) -> str:
             return ""
         raw = await read_bytes(plugin, child_uri)
         # share the description gate so a folded-in image draws from the same VLM in-flight
-        # budget as the Map ImageChunksProducer (§5.5).
+        # budget as the Object Lane ImageChunksProducer (§5.5).
         async with coord.description_gate:
             out = await coord.vlm.describe(raw, ext)
         return out[:cap]
     if okind == "document" and ext in CONVERT_EXTS:
         raw = await read_bytes(plugin, child_uri)
+        # Reuse the Object Lane's converted_md when it matches this source + converter version
+        # (currency token), else convert and cache it so the Object Lane reuses it in turn.
+        if coord.artifacts is not None:
+            currency = coord.converter.currency(raw)
+            builder = coord.builders.get(job_id)
+            full_uri = (builder.connector_uri if builder else "") + child_uri
+            art = await coord.artifacts.get_artifact_fresh(
+                coord.namespace_id, full_uri, "converted_md", currency
+            )
+            if art is not None:
+                return art.decode("utf-8", errors="replace")[:cap]
+            md = await coord.converter.convert(raw, ext)
+            await coord.artifacts.put_artifact(
+                coord.namespace_id, full_uri, "converted_md", md.encode(), currency
+            )
+            return md[:cap]
         return (await coord.converter.convert(raw, ext))[:cap]
     if okind in ("document", "code", "text_blob"):
         return (await read_text(plugin, child_uri))[:cap]

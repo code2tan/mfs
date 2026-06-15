@@ -10,11 +10,11 @@ Outward concept map (design doc §2 terms table):
               lookup table. Power users wanting split backends can still
               override [metadata] / [transformation_cache] explicitly.
   Cache     — one outward "Cache" concept covering both halves:
-              - artifact half: blobs (PDF→md, VLM summaries) under
-                [artifact_cache] (backend = local | s3)
-              - transformation half: KV lookups under
-                [transformation_cache] (policy; backend inherits from
-                [database])
+              - artifact half: derived blobs (PDF→md, …) under
+                [artifact_cache] (local filesystem)
+              - transformation half: model-output KV lookups (embeddings,
+                VLM, summaries) under [transformation_cache] (policy;
+                backend inherits from [database])
 
 The wizard writes [database] + [artifact_cache] directly. Legacy tomls
 with [metadata] backend / [object_store] / [artifact_cache] policy are
@@ -94,24 +94,15 @@ class TransformationCacheConfig(StrictConfigModel):
 class ArtifactCacheConfig(StrictConfigModel):
     """Artifact half of the outward Cache concept.
 
-    Stores derived blobs per object: PDF→markdown conversions, VLM image
-    descriptions, etc. Lives on local fs (default) or in S3-compatible
-    object storage (covers AWS S3 / R2 / GCS / MinIO via endpoint_url).
-    Size/eviction policy lives in the same section because it acts on the
-    same backend — there's no point splitting storage vs policy across
-    two TOML blocks for one concept.
+    Stores derived blobs per object (PDF→markdown conversions, web/github
+    page markdown, …) on the local filesystem. It is a regenerable cache:
+    mount a volume at `root` to persist it across container restarts. Size /
+    eviction policy lives in the same section because it acts on the same
+    store — no point splitting storage vs policy across two TOML blocks.
     """
 
-    backend: str = "local"  # local | s3
-    root: str = ""  # local root (default $MFS_HOME/cache)
-    # s3 backend (also R2/GCS/MinIO via endpoint_url)
-    bucket: str = ""
-    prefix: str = "mfs"
-    endpoint_url: str = ""  # set for R2/GCS/MinIO; empty = AWS
-    region: str = "us-east-1"
-    access_key_id: str = ""
-    secret_access_key: str = ""
-    # Eviction policy (applies to the artifact blobs regardless of backend).
+    root: str = ""  # cache root (default $MFS_HOME/cache)
+    # Eviction policy.
     max_size_gb: float = 10.0
     eviction: str = "lru"
 
@@ -167,11 +158,11 @@ class EmbeddingConfig(StrictConfigModel):
 
 
 class SummaryConfig(StrictConfigModel):
-    """[summary] — directory / file summaries (Reduce subsystem, §3.5)."""
+    """[summary] — directory / file summaries (Job Lane, §3.5)."""
 
     # Master opt-in. §7.2's example omits this, but it is kept so the default stays OFF
     # (directory summaries cost an LLM call per directory — opt-in avoids surprise bills);
-    # the ReduceCoordinator is fully inert unless enabled.
+    # the JobLaneCoordinator is fully inert unless enabled.
     enabled: bool = False
     provider: str = "openai"
     model: str = "gpt-4o-mini"
@@ -317,10 +308,10 @@ def _migrate_legacy_blocks(data: dict[str, Any]) -> None:
        a legacy backend/dsn is set, copy it across so the user doesn't have
        to re-run the wizard.
 
-    2. [object_store] (storage backend) + [artifact_cache] (size policy)
-       were merged into [artifact_cache] (storage + policy in one block).
-       Move object_store keys into artifact_cache; preserve any existing
-       artifact_cache policy fields.
+    2. [artifact_cache] is a local-filesystem store now. Drop the legacy
+       [object_store] block and any S3-era keys so old configs keep loading
+       — they just fall back to the local cache (it is regenerable, nothing
+       is lost).
     """
     # 1. [database] from legacy [metadata]/[transformation_cache]
     if "database" not in data:
@@ -339,15 +330,22 @@ def _migrate_legacy_blocks(data: dict[str, Any]) -> None:
             if legacy_dsn:
                 data["database"]["dsn"] = legacy_dsn
 
-    # 2. [artifact_cache] from legacy [object_store] + old [artifact_cache] policy
-    legacy_os = data.pop("object_store", None)
-    if legacy_os:
-        merged = dict(data.get("artifact_cache") or {})
-        # Old [artifact_cache] (policy) keys take precedence — they were the
-        # explicit value; storage fields from [object_store] fill in the rest.
-        for k, v in legacy_os.items():
-            merged.setdefault(k, v)
-        data["artifact_cache"] = merged
+    # 2. [artifact_cache] is local-fs only: drop legacy [object_store] and any
+    #    S3-era keys so an old toml still loads (policy keys root/max_size_gb/
+    #    eviction are kept).
+    data.pop("object_store", None)
+    ac = data.get("artifact_cache")
+    if isinstance(ac, dict):
+        for dead in (
+            "backend",
+            "bucket",
+            "prefix",
+            "endpoint_url",
+            "region",
+            "access_key_id",
+            "secret_access_key",
+        ):
+            ac.pop(dead, None)
 
 
 # V0.4 engine refactor renamed several sections + dropped dead keys with NO backward-compat
@@ -476,22 +474,6 @@ def _apply_env_overrides(cfg: ServerConfig) -> None:
     if tx_dsn and os.environ.get("MFS_TX_CACHE_PG"):  # opt-in: share PG for tx cache
         cfg.transformation_cache.backend = "postgres"
         cfg.transformation_cache.dsn = tx_dsn
-
-    # Artifact cache (S3-class) backend env overrides.
-    bucket = os.environ.get("MFS_OBJECT_STORE_BUCKET")
-    if bucket:
-        cfg.artifact_cache.backend = "s3"
-        cfg.artifact_cache.bucket = bucket
-        for env_k, attr in (
-            ("MFS_OBJECT_STORE_ENDPOINT", "endpoint_url"),
-            ("MFS_OBJECT_STORE_REGION", "region"),
-            ("MFS_OBJECT_STORE_ACCESS_KEY", "access_key_id"),
-            ("MFS_OBJECT_STORE_SECRET_KEY", "secret_access_key"),
-            ("MFS_OBJECT_STORE_PREFIX", "prefix"),
-        ):
-            v = os.environ.get(env_k)
-            if v:
-                setattr(cfg.artifact_cache, attr, v)
 
 
 def _redact_uri(uri: str) -> str:

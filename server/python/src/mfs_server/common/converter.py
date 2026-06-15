@@ -1,64 +1,50 @@
-"""Converter client: file bytes -> markdown, memoized in transformation cache
-. markitdown default (one lib covers PDF/DOCX/PPTX/XLSX/HTML).
-Result also stored as converted_md artifact by the engine. Web crawler does NOT use
-this path (its HTML->md is backend-coupled inside the connector).
+"""Converter client: file bytes -> markdown. markitdown default (one lib covers
+PDF/DOCX/PPTX/XLSX/HTML).
+
+This is a simple, deterministic file-format conversion — not a model call — so it is
+not memoized in the transformation cache (which is reserved for model outputs:
+embeddings, VLM descriptions, summaries). Its result is cached at the artifact layer
+instead, per object. Web crawler does NOT use this path (its HTML->md is
+backend-coupled inside the connector).
 """
 
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 import tempfile
 
 from ..config import ServerConfig
-from ..storage.ids import cache_key, sha1_hex
-from ..storage.transformation_cache import TransformationCache
 
 # extensions the framework converter turns into markdown (file-form documents)
 CONVERT_EXTS = {".pdf", ".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls", ".html", ".htm"}
 
 
-class CachingConverterClient:
-    def __init__(self, cfg: ServerConfig, tx_cache: TransformationCache):
+class ConverterClient:
+    def __init__(self, cfg: ServerConfig):
         self.default = cfg.conversion.default  # "markitdown"
         self.provider = "markitdown"
         self.version = "1"
-        self.tx_cache = tx_cache
         self._md = None
-        self.api_calls = 0
-        self.cache_hits = 0
 
-    def _key(self, data: bytes) -> str:
-        return cache_key(sha1_hex(data), "convert", self.provider, self.default, self.version)
+    def identity(self) -> str:
+        """The converter's self-described identity — provider + library + version. Fold any
+        converter parameters in here (as the model clients fold provider/model/version/prompt
+        into their transformation-cache key) so changing them invalidates cached conversions.
+        markitdown currently exposes no tunable params, so this is just the version tuple."""
+        return f"{self.provider}.{self.default}.{self.version}"
+
+    def currency(self, data: bytes) -> str:
+        """Artifact-cache freshness token for converting `data`: source content hash + the
+        converter identity. The Object Lane and Job Lane compute it identically, so the Job
+        Lane reuses the Object Lane's `converted_md` only when BOTH the source content and the
+        converter identity match — a changed source or an upgraded converter misses and
+        re-converts."""
+        return f"{hashlib.sha1(data).hexdigest()}:{self.identity()}"
 
     async def convert(self, data: bytes, ext: str) -> str:
-        key = self._key(data)
-        h = sha1_hex(data)
-        ran = False
-
-        async def _compute() -> bytes:
-            nonlocal ran
-            ran = True
-            md = await asyncio.to_thread(self._convert_sync, data, ext)
-            return md.encode()
-
-        # per-key lock: the Map text producer and the Reduce SummaryWorker can both miss the
-        # same document hash concurrently; with the lock the (expensive) conversion runs once
-        # (§3.4).
-        out = await self.tx_cache.get_or_compute(
-            key,
-            _compute,
-            kind="convert",
-            input_hash=h,
-            provider=self.provider,
-            model=self.default,
-            model_version=self.version,
-        )
-        if ran:
-            self.api_calls += 1
-        else:
-            self.cache_hits += 1
-        return out.decode("utf-8", errors="replace")
+        return await asyncio.to_thread(self._convert_sync, data, ext)
 
     def _convert_sync(self, data: bytes, ext: str) -> str:
         from markitdown import MarkItDown

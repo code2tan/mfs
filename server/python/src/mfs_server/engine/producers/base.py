@@ -1,4 +1,4 @@
-"""ChunksProducer protocol + shared types for the Map subsystem.
+"""ChunksProducer protocol + shared types for the Object Lane.
 
 A ChunksProducer turns one ObjectTask into a stream of `Chunk` objects followed
 by an `EndOfTask` sentinel (per-object atomic boundary, see design §6.1). The
@@ -137,12 +137,19 @@ class ArtifactStore(Protocol):
     artifact_cache + its metadata row; tests back it with an in-memory fake."""
 
     async def put_artifact(
-        self, namespace_id: str, object_uri: str, kind: str, data: bytes
+        self, namespace_id: str, object_uri: str, kind: str, data: bytes, currency: str = ""
     ) -> None: ...
 
     async def get_artifact(
         self, namespace_id: str, object_uri: str, kind: str
     ) -> Optional[bytes]: ...
+
+    async def get_artifact_fresh(
+        self, namespace_id: str, object_uri: str, kind: str, currency: str
+    ) -> Optional[bytes]:
+        """Return the artifact bytes only if its stored currency token matches `currency`
+        (same source content + producer version); otherwise None, so the caller recomputes."""
+        ...
 
     def artifact_path(self, namespace_id: str, object_uri: str, kind: str) -> str:
         """Filesystem path backing this artifact, for streaming materialization
@@ -162,7 +169,7 @@ class ProducerContext:
     cfg: Any  # ServerConfig
     namespace_id: str
     artifacts: ArtifactStore
-    converter: Any  # CachingConverterClient: async convert(data, ext) -> str
+    converter: Any  # ConverterClient: async convert(data, ext) -> str
     vlm: Any  # CachingVlmClient: async describe(data, ext) -> str
     summary: Any  # CachingSummaryClient: async summarize(text, kind) -> str
     description_gate: ConcurrencyGate

@@ -1,20 +1,20 @@
-"""Reduce subsystem (§3.3 / §3.5 / §6.4): dir_summary as its own scheduling lane.
+"""Job Lane (§3.3 / §3.5 / §6.4): directory summaries as their own scheduling lane.
 
-Unlike Map work (per-object, self-contained, in the object_tasks table), a directory summary
-is a REDUCE over a directory's children — it has a DAG dependency (sub-dirs before parents)
-and bottom-up ordering. So it lives OUTSIDE object_tasks: a per-job in-memory DirTree
-(reduce/tree.py) + a global priority queue (reduce/queue.py) + a SummaryWorker pool
-(reduce/worker.py). Summaries are emitted as Chunks into the SAME chunks_q the Map producers
-use, so the EmbedConsumer indexes them uniformly.
+The Object Lane works at object granularity (per-object, self-contained, in the object_tasks
+table). The Job Lane works at job granularity: a directory summary folds a directory's
+children, with a DAG dependency (sub-dirs before parents) and bottom-up ordering. So it lives
+OUTSIDE object_tasks: a per-job in-memory DirTree (job_lane/tree.py) + a global priority queue
+(job_lane/queue.py) + a SummaryWorker pool (job_lane/worker.py). The two lanes run in parallel
+and both emit Chunks into the SAME chunks_q, so the EmbedConsumer indexes them uniformly.
 
 Coordinator hooks the engine calls:
   register_job(job_id, connector_uri, plugin)  — at sync start
   on_yield_object_change(job_id, uri, okind)   — per non-deleted sync() yield
   on_sync_done(job_id)                          — at sync end (finalize the tree)
-  on_embed_succeeded(task_uri, job_id)          — registered with EmbedConsumer; drives both
-                                                  the Map→Reduce file notification AND the
-                                                  dir_summary persist accounting
-  await_reduce_done(job_id)                     — block until all of a job's dir summaries
+  on_embed_succeeded(task_uri, job_id)          — registered with EmbedConsumer; counts a
+                                                  dir_summary as persisted (file successes are
+                                                  ignored — files do not gate a dir)
+  await_done(job_id)                     — block until all of a job's dir summaries
                                                   are computed + persisted
   evict_job(job_id)                             — free a terminal job's DirTree
 
@@ -25,7 +25,6 @@ is inert and every hook is a no-op, so the default path is unchanged.
 from __future__ import annotations
 
 import asyncio
-import posixpath
 from typing import Any, Optional
 
 from ..pipeline import TaskEnvelope
@@ -39,15 +38,10 @@ from .queue import SummaryQueue
 from .tree import DirTreeBuilder
 from .worker import run_summary_worker
 
-__all__ = ["ReduceCoordinator", "build_reduce_subsystem"]
-
-# Map task statuses that are final and will NOT flow through the EmbedConsumer again, so
-# crash recovery must pre-decrement their parent's pending for every one of them — not just
-# 'succeeded', else a failed/cancelled/skipped child would wedge the dir forever.
-_TERMINAL_TASK_STATUSES = ("succeeded", "failed", "cancelled", "skipped")
+__all__ = ["JobLaneCoordinator", "build_job_lane"]
 
 
-class ReduceCoordinator:
+class JobLaneCoordinator:
     def __init__(
         self,
         cfg,
@@ -57,6 +51,8 @@ class ReduceCoordinator:
         vlm,
         converter,
         chunks_q,
+        artifacts=None,
+        namespace_id="default",
         description_gate=None,
         summary_gate=None,
     ):
@@ -73,7 +69,11 @@ class ReduceCoordinator:
         self.vlm = vlm
         self.converter = converter
         self.chunks_q = chunks_q
-        # Concurrency gates (§5.5) shared with the Map producers, so a SummaryWorker's summary /
+        # Artifact store + namespace let a SummaryWorker reuse the Object Lane's converted_md
+        # for a child document (via the converter currency token) instead of re-converting.
+        self.artifacts = artifacts
+        self.namespace_id = namespace_id
+        # Concurrency gates (§5.5) shared with the Object Lane producers, so a SummaryWorker's summary /
         # VLM provider call draws from the same in-flight budget as image / table_schema. Default
         # to fresh gates sized by cfg when none is injected (e.g. unit tests).
         self.summary_gate = summary_gate or SummaryConcurrencyGate(cfg.summary.concurrency)
@@ -87,10 +87,6 @@ class ReduceCoordinator:
         # per-job completion: {"total": int, "persisted": int, "event": asyncio.Event}
         self._completion: dict[str, dict] = {}
         self._file_summary_candidates: dict[str, list] = {}  # file_summary opt-in (§6.4.7)
-        # Map files whose success landed BEFORE on_sync_done (the global-claim pump can finalize
-        # a task while enumeration is still running). Their parent decrement is replayed at
-        # sync-done so it is never lost (§6.4.4).
-        self._early_succeeded: dict[str, list[str]] = {}
         self._tasks: list[asyncio.Task] = []
 
     # --- lifecycle ---
@@ -143,18 +139,14 @@ class ReduceCoordinator:
         builder = self.builders.get(job_id)
         if builder is None:
             return
-        builder.finalize(self.queue)  # flips sync_done; pushes already-complete (empty) leaves
-        # Replay any file successes that landed before enumeration finished: now that the tree
-        # is complete their parent decrements can be applied (and may push a now-ready leaf).
-        for relpath in self._early_succeeded.pop(job_id, []):
-            self._notify_parent(job_id, builder, relpath)
+        builder.finalize(self.queue)  # flips sync_done; pushes every leaf dir (no sub-dirs)
         st = self._completion.get(job_id)
         if st is not None:
             st["total"] = len(builder.tree)
             if st["total"] == 0:  # no dirs (empty sync / no hierarchy) -> trivially done
                 st["event"].set()
 
-    # --- EmbedConsumer success hook (Map→Reduce notify §6.4.4 + dir persist accounting) ---
+    # --- EmbedConsumer success hook (dir_summary persist accounting) ---
     def on_embed_succeeded(
         self,
         task_uri: str,
@@ -163,10 +155,10 @@ class ReduceCoordinator:
         partial: bool = False,
         error: Optional[str] = None,
     ) -> None:
-        # chunk_count / partial / error are unused here (Reduce only needs the parent-pending
-        # notify), but accepted so the single finalize-hook signature carries them for the
-        # objects-table updater. A failed file still reached a terminal state, so its parent
-        # dir must still be decremented (same as success) or the dir summary would wedge.
+        # chunk_count / partial / error are unused here, but accepted so the single
+        # finalize-hook signature carries them for the objects-table updater. Files no longer
+        # gate any dir (a dir folds source content, not embeddings), so a file's success is
+        # ignored here; only a persisted directory_summary advances the completion count.
         if not self.enabled or job_id is None:
             return
         builder = self.builders.get(job_id)
@@ -181,24 +173,6 @@ class ReduceCoordinator:
                 st["persisted"] += 1
                 if st["persisted"] >= st["total"]:
                     st["event"].set()
-            return
-        # otherwise a Map file task succeeded -> notify its parent dir
-        if not builder.sync_done:
-            # The file finished before enumeration completed. Stash it instead of dropping the
-            # decrement; on_sync_done replays it once the tree is complete (§6.4.4).
-            self._early_succeeded.setdefault(job_id, []).append(relpath)
-            return
-        self._notify_parent(job_id, builder, relpath)
-
-    def _notify_parent(self, job_id: str, builder: DirTreeBuilder, relpath: str) -> None:
-        """Decrement a file's parent dir pending; push the parent when it reaches zero."""
-        parent = posixpath.dirname(relpath) or "/"
-        node = builder.tree.get(parent)
-        if node is None:
-            return
-        node.pending -= 1
-        if node.pending == 0:
-            self.queue.push(job_id, parent, node.depth)
 
     # --- worker callback: emit a dir summary into chunks_q ---
     async def emit_dir_summary(
@@ -206,7 +180,7 @@ class ReduceCoordinator:
     ) -> None:
         """Emit one directory as a per-object task into chunks_q: a directory_summary Chunk
         (when non-empty) plus an EndOfTask. The EmbedConsumer delete-then-upserts it (per-object
-        atomic) exactly like a Map chunk; an empty summary becomes a chunk-less task that just
+        atomic) exactly like an Object Lane chunk; an empty summary becomes a chunk-less task that just
         purges any stale summary. Either way the persist success hook lands in on_embed_succeeded."""
         full_uri = connector_uri + dir_uri
         task_id = f"reduce:{job_id}:{dir_uri}"
@@ -238,7 +212,7 @@ class ReduceCoordinator:
         )
 
     # --- completion + teardown ---
-    async def await_reduce_done(self, job_id: str) -> None:
+    async def await_done(self, job_id: str) -> None:
         if not self.enabled:
             return
         st = self._completion.get(job_id)
@@ -246,14 +220,14 @@ class ReduceCoordinator:
             return
         await st["event"].wait()
 
-    def is_reduce_done(self, job_id: str) -> bool:
+    def is_done(self, job_id: str) -> bool:
         """Synchronous completion check for the ConnectorJobWatcher: True when this job has
         no outstanding directory summaries (or no reduce work at all)."""
         if not self.enabled:
             return True
         st = self._completion.get(job_id)
         if st is None:
-            return True  # job not tracked by the reduce subsystem -> nothing to wait on
+            return True  # job not tracked by the Job Lane -> nothing to wait on
         return st["event"].is_set()
 
     def active_jobs(self) -> list[str]:
@@ -266,7 +240,6 @@ class ReduceCoordinator:
         self.job_plugins.pop(job_id, None)
         self._completion.pop(job_id, None)
         self._file_summary_candidates.pop(job_id, None)
-        self._early_succeeded.pop(job_id, None)
         self.queue.evict_job(job_id)
 
     # --- crash recovery (§6.4.5) ---
@@ -279,10 +252,9 @@ class ReduceCoordinator:
         existing_summaries: list[tuple[str, str]],  # (dir_uri relative, content)
     ) -> None:
         """Rebuild a 'running' job's DirTree after a restart (server died mid-Phase-2). The
-        sync had already finished, so sync_done is assumed True. Already-succeeded files
-        pre-decrement their parent's pending; dirs whose summary already reached Milvus are
-        seeded (and their parent pre-decremented + counted as persisted) so they are not
-        recomputed."""
+        sync had already finished, so sync_done is assumed True. Files do not gate a dir, so
+        only sub-dir dependencies matter: dirs whose summary already reached Milvus are seeded
+        (their parent pre-decremented + counted as persisted) so they are not recomputed."""
         if not self.enabled:
             return
         builder = DirTreeBuilder(job_id, connector_uri, recursive=self.recursive)
@@ -292,14 +264,6 @@ class ReduceCoordinator:
         self.job_plugins[job_id] = plugin
         builder.sync_done = True
         persisted = 0
-        # files already in a terminal state: their parent no longer waits on them. ALL terminal
-        # statuses count (not just 'succeeded') — a failed/cancelled/skipped child will never
-        # flow through Map again, so leaving its pending up would wedge the dir forever.
-        for uri, _, status in objects:
-            if status in _TERMINAL_TASK_STATUSES:
-                node = builder.tree.get(posixpath.dirname(uri) or "/")
-                if node is not None:
-                    node.pending -= 1
         # dirs already summarized: seed + don't recompute
         existing = dict(existing_summaries)
         for dir_uri, content in existing_summaries:
@@ -323,19 +287,32 @@ class ReduceCoordinator:
             st["event"].set()
 
 
-def build_reduce_subsystem(
-    cfg, *, tx_cache, summary, vlm, converter, chunks_q, description_gate=None, summary_gate=None
-) -> ReduceCoordinator:
-    """Construct the Reduce coordinator. The caller (engine) registers its on_embed_succeeded
+def build_job_lane(
+    cfg,
+    *,
+    tx_cache,
+    summary,
+    vlm,
+    converter,
+    chunks_q,
+    artifacts=None,
+    namespace_id="default",
+    description_gate=None,
+    summary_gate=None,
+) -> JobLaneCoordinator:
+    """Construct the Job Lane coordinator. The caller (engine) registers its on_embed_succeeded
     with the EmbedConsumer and calls start() after the event loop is running. The
-    description/summary gates are shared with the Map producers (§5.5)."""
-    return ReduceCoordinator(
+    description/summary gates are shared with the Object Lane producers (§5.5); the artifact store is
+    shared too, so the Job Lane reuses the Object Lane's converted_md."""
+    return JobLaneCoordinator(
         cfg,
         tx_cache=tx_cache,
         summary=summary,
         vlm=vlm,
         converter=converter,
         chunks_q=chunks_q,
+        artifacts=artifacts,
+        namespace_id=namespace_id,
         description_gate=description_gate,
         summary_gate=summary_gate,
     )

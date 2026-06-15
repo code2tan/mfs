@@ -1,11 +1,12 @@
 """VLM client: image bytes -> description text, memoized in transformation cache.
 
 Multi-provider (openai/anthropic/gemini); the configured [description].provider drives
-the lookup. Result is stored as a vlm_text artifact + indexed as a vlm_description chunk.
+the lookup. The description is indexed as a vlm_description chunk and memoized here in
+the transformation cache; `mfs cat` of an image re-derives it through this same client.
 
 This client holds NO concurrency control of its own: the [description].concurrency ceiling
 is enforced by the shared DescriptionConcurrencyGate (engine/producers/base.py) at every
-call site (ImageChunksProducer, the Reduce SummaryWorker), so a single process-wide budget
+call site (ImageChunksProducer, the Job Lane SummaryWorker), so a single process-wide budget
 governs in-flight VLM calls regardless of where describe() is invoked (§5.5).
 """
 
@@ -72,7 +73,7 @@ class CachingVlmClient:
             return desc.encode()
 
         # get_or_compute holds a per-key lock so concurrent callers that all miss the same
-        # image (Map ImageChunksProducer + Reduce SummaryWorker) fire the provider EXACTLY
+        # image (Object Lane ImageChunksProducer + Job Lane SummaryWorker) fire the provider EXACTLY
         # once (§3.4), instead of each issuing the expensive VLM call.
         out = await self.tx_cache.get_or_compute(
             key,
