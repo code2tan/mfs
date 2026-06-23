@@ -46,6 +46,18 @@ from .producers.render import render_record, resolve_path
 from .job_watcher import ConnectorJobWatcher
 from .job_lane import build_job_lane
 from .state import ConnectorStateStore
+from .components import (
+    ArtifactCacheService,
+    ConnectorManager,
+    ConnectorFactory,
+    InfraStack,
+    IngestOrchestrator,
+    ObjectRepository,
+    PipelineSupervisor,
+    ReadService,
+    UploadService,
+    WorkerScheduler,
+)
 
 _SCHEME_RE = re.compile(r"^([a-z][a-z0-9+.\-]*)://")
 _HEAD_CACHE_N = 100  # rows pre-cached per structured object to speed `head`
@@ -210,6 +222,20 @@ class Engine:
         # ConnectorJobWatcher: out-of-band job completion / cancel / job-lane-evict (§5.7).
         self._job_watcher = None
         self._job_watcher_task: asyncio.Task | None = None
+        # --- 阶段 0 脚手架：协作组件（空壳，转发回旧方法）---
+        # 见 docs/engine-redesign.md §7 阶段 0。Engine 仍直接持有上述全部字段并跑原实现；
+        # 这里的组件仅占位，公共方法转发回 Engine 同名实现，行为零变化。后续阶段 1–7 把
+        # 实现逐步迁入组件，Engine 退化为纯 Facade（§4.1）。构造顺序对齐 §4.1 蓝图。
+        self.infra = InfraStack(self)
+        self.objects = ObjectRepository(self)
+        self.artifacts = ArtifactCacheService(self)
+        self.pipeline = PipelineSupervisor(self)
+        self.factory = ConnectorFactory(self)
+        self.ingest = IngestOrchestrator(self)
+        self.worker = WorkerScheduler(self)
+        self.reads = ReadService(self)
+        self.upload = UploadService(self)
+        self.connector_manager = ConnectorManager(self)
 
     async def startup(self, *, preload_local_models: bool = False) -> None:
         load_builtin()
