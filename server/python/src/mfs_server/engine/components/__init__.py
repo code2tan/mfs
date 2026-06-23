@@ -22,24 +22,37 @@ from __future__ import annotations
 
 from .manage import ConnectorManager
 from .artifact_cache import ArtifactCacheService
-from .connector_factory import ConnectorFactory
+from .connector_factory import (
+    ConnectorFactory,
+    CredentialRedactor,
+    CredentialResolver,
+    TargetResolution,
+    TargetResolver,
+)
 from .ingest import IngestOrchestrator
 from .infra import InfraStack
 from .object_repository import ObjectRepository
 from .pipeline_supervisor import PipelineSupervisor
 from .reads import ReadService
 from .upload import UploadService
-from .worker import WorkerScheduler
+from .worker import BackoffPolicy, ErrorClass, ErrorClassifier, WorkerScheduler
 
 __all__ = [
     "ArtifactCacheService",
+    "BackoffPolicy",
     "ConnectorManager",
     "ConnectorFactory",
+    "CredentialRedactor",
+    "CredentialResolver",
+    "ErrorClass",
+    "ErrorClassifier",
     "IngestOrchestrator",
     "InfraStack",
     "ObjectRepository",
     "PipelineSupervisor",
     "ReadService",
+    "TargetResolution",
+    "TargetResolver",
     "UploadService",
     "WorkerScheduler",
 ]

@@ -42,24 +42,29 @@ from .producers.base import (
     SummaryConcurrencyGate,
     cap_content,
 )
-from .producers.render import render_record, resolve_path
+from .producers.render import render_record
 from .job_watcher import ConnectorJobWatcher
 from .job_lane import build_job_lane
 from .state import ConnectorStateStore
 from .components import (
     ArtifactCacheService,
+    BackoffPolicy,
     ConnectorManager,
     ConnectorFactory,
+    CredentialRedactor,
+    CredentialResolver,
+    ErrorClassifier,
     InfraStack,
     IngestOrchestrator,
     ObjectRepository,
     PipelineSupervisor,
     ReadService,
+    TargetResolver,
     UploadService,
     WorkerScheduler,
 )
+from .components.reads.text_views import density_view, locator_matches
 
-_SCHEME_RE = re.compile(r"^([a-z][a-z0-9+.\-]*)://")
 _HEAD_CACHE_N = 100  # rows pre-cached per structured object to speed `head`
 _BARE_CAT_MAX_BYTES = 5 * 1024 * 1024  # bare `cat` (no range) rejects objects larger than this
 _GREP_LINEAR_SCAN_MAX = 200  # cap on not-indexed files a single grep scans linearly
@@ -128,36 +133,6 @@ def _match_object_config(objects_cfg: list, path: str) -> ObjectConfig | None:
         if m and (fnmatch.fnmatch(path, m) or fnmatch.fnmatch(path.lstrip("/"), m) or m in path):
             return ObjectConfig(**{k: v for k, v in o.items() if k != "match" and k in fields})
     return None
-
-
-_CODE_SYMBOL = re.compile(r"^\s*(def |class |func |fn |public |private |func\(|type )")
-
-
-def _density_view(text: str, ext: str, density: str) -> str:
-    """Skeleton view of a document/code object:
-    peek = headings (markdown #) or code symbol lines only;
-    skim = peek + the first non-blank line of prose under each heading.
-    """
-    lines = text.splitlines()
-    is_md = ext in (".md", ".markdown", ".rst", ".txt", "")
-    out: list[str] = []
-    if is_md:
-        for i, ln in enumerate(lines):
-            if ln.lstrip().startswith("#"):
-                out.append(ln.rstrip())
-                if density == "skim":
-                    for nxt in lines[i + 1 :]:
-                        if nxt.strip():
-                            out.append("    " + nxt.strip()[:120])
-                            break
-    else:
-        for ln in lines:
-            if _CODE_SYMBOL.match(ln):
-                out.append(ln.rstrip() if density == "skim" else ln.split("(")[0].rstrip())
-    if not out:
-        # nothing structural found -> first lines as a fallback peek
-        out = [ln.rstrip() for ln in lines[:15]]
-    return "\n".join(out)
 
 
 class _PipelineEmbedConsumer(EmbedConsumer):
@@ -604,131 +579,26 @@ class Engine:
 
     # --- target resolution (Phase 2: file only) ---
     def _resolve_target(self, target: str) -> tuple[str, str, str, dict]:
-        m = _SCHEME_RE.match(target)
-        if m:
-            sch = m.group(1)
-            if sch == "github":
-                # github://<owner>/<repo> (also tolerate github://github.com/<owner>/<repo>):
-                # derive `repo` from the URI into the connector config so the bare documented
-                # form works without an explicit `--config repo=…`. This mirrors how a local
-                # path injects {root}; the plugin has no access to its own connector URI, so
-                # the identity must be carried in config. Without it the github plugin's
-                # _owner_repo() has no repo and the sync/read path raises a 500.
-                rest = target[len("github://") :].strip("/")
-                if rest.startswith("github.com/"):
-                    rest = rest[len("github.com/") :]
-                parts = [p for p in rest.split("/") if p]
-                cfg = {"repo": f"{parts[0]}/{parts[1]}"} if len(parts) >= 2 else {}
-                return "github", target, "github", cfg
-            if sch in (
-                "web",
-                "github",
-                "postgres",
-                "mysql",
-                "mongo",
-                "slack",
-                "discord",
-                "gmail",
-                "notion",
-                "jira",
-                "linear",
-                "zendesk",
-                "hubspot",
-                "bigquery",
-                "snowflake",
-                "s3",
-                "gdrive",
-                "feishu",
-            ):
-                return sch, target, sch, {}
-            if sch != "file":
-                raise NotImplementedError(f"connector scheme '{sch}' not yet implemented")
-        # file:///abs/path — empty authority — is the canonical URI for a LOCAL path
-        #: treat it as the local path, not an upload identity, so
-        # `mfs add file:///abs/path` registers with a real root instead of failing.
-        if target.startswith("file:///"):
-            abs_path = os.path.abspath(target[len("file://") :])
-            return (
-                "file",
-                f"file://local{abs_path}",
-                "file",
-                {"root": abs_path, "client_id": "local"},
-            )
-        # canonical local URI: file://local<abs_path> — what `mfs connector list` prints.
-        # Map it back to the same (root, connector_uri) a bare path would resolve to,
-        # so inspect/remove/update accept the identifier `connector list` shows.
-        if target.startswith("file://local/"):
-            abs_path = target[len("file://local") :]
-            return (
-                "file",
-                f"file://local{abs_path}",
-                "file",
-                {"root": abs_path, "client_id": "local"},
-            )
-        # logical upload identity file://<client_id><abs> (client_id != local): the real
-        # config (staging root) lives on the already-registered connector, so return bare.
-        if target.startswith("file://") and not target.startswith("file://local"):
-            return "file", target, "file", {}
-        # local path -> file connector
-        abs_path = os.path.abspath(target)
-        connector_uri = f"file://local{abs_path}"
-        return "file", connector_uri, "file", {"root": abs_path, "client_id": "local"}
+        # 阶段 1：纯逻辑已迁入 ``TargetResolver``（components/connector_factory.py）。
+        # 原 4-tuple ``(scheme, connector_uri, ctype, config)`` 中 scheme 与 ctype 恒等，
+        # 故 ``TargetResolution`` 只保留 3 字段，此处按原顺序重建以保持所有调用点不变。
+        res = TargetResolver.resolve(target)
+        return res.ctype, res.connector_uri, res.ctype, res.config
 
-    # substrings that mark a config key as holding a secret. Matched case-insensitively
-    # anywhere in the key, and recursively (nested OAuth token dicts, lists), so e.g.
-    # secret_access_key / refresh_token / client_secret are all caught.
-    # dsn (postgres) carries credentials but doesn't contain any of the obvious words;
-    # we DON'T add 'uri'/'url' here because those also name benign fields (mongo's
-    # password is caught by the value check below, while the web connector's target
-    # urls must be kept).
-    _SECRET_SUBSTRINGS = (
-        "token",
-        "secret",
-        "password",
-        "passwd",
-        "apikey",
-        "api_key",
-        "access_key",
-        "private_key",
-        "refresh",
-        "credential",
-        "dsn",
-        "session_id",
-    )
-    # credential-reference schemes that are actually resolved (see _resolve_ref). Only these
-    # are treated as safe (kept, not redacted); anything else under a secret key is redacted,
-    # so an unimplemented scheme can't masquerade as a working ref and silently fail auth.
-    _CRED_REF_PREFIXES = ("env:", "file:")
-    # a connection string carrying inline credentials: scheme://user:password@host…
-    # (postgres://u:p@…, mongodb://u:p@…). A plain URL with no userinfo password is NOT
-    # matched, so web targets / instance_url stay intact.
-    _CONN_URI_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9+.\-]*://[^/\s:@]+:[^/\s@]+@")
-    _REDACTED = "<redacted: use credential_ref=env:VAR>"
+    # 凭证 redact / secret-key 判定已迁入 ``CredentialRedactor``（阶段 1）。保留薄委派
+    # 供 ``register_or_get_connector`` 等内部调用点使用，行为零变化。
+    _SECRET_SUBSTRINGS = CredentialRedactor._SECRET_SUBSTRINGS
+    _CRED_REF_PREFIXES = CredentialRedactor._CRED_REF_PREFIXES
+    _CONN_URI_RE = CredentialRedactor._CONN_URI_RE
+    _REDACTED = CredentialRedactor._REDACTED
 
     @classmethod
     def _is_secret_key(cls, key: str) -> bool:
-        kl = str(key).lower()
-        return any(s in kl for s in cls._SECRET_SUBSTRINGS)
+        return CredentialRedactor.is_secret_key(key)
 
     @classmethod
     def _redact_config(cls, value, key_is_secret: bool = False):
-        """Recursively redact raw inline secrets from a config before persistence. A
-        credential_ref (env:/secret:/file:/vault:) is kept; anything else under a
-        secret-looking key is replaced. Recurses into dicts/lists so nested OAuth token
-        dicts don't leak."""
-        if isinstance(value, dict):
-            return {k: cls._redact_config(v, cls._is_secret_key(k)) for k, v in value.items()}
-        if isinstance(value, list):
-            return [cls._redact_config(v, key_is_secret) for v in value]
-        if isinstance(value, str) and value.startswith(cls._CRED_REF_PREFIXES):
-            return value  # a safe credential reference, keep as-is
-        if key_is_secret and value not in (None, "", [], {}):
-            return cls._REDACTED
-        # value-level catch: an inline connection string carrying a password leaks via a
-        # field name (dsn/uri/url/connection) that doesn't look secret — redact by shape.
-        if isinstance(value, str) and cls._CONN_URI_RE.search(value):
-            return cls._REDACTED
-        return value
+        return CredentialRedactor.redact(value, key_is_secret=key_is_secret)
 
     async def register_or_get_connector(
         self, connector_uri: str, ctype: str, config: dict, overwrite_config: bool = False
@@ -784,33 +654,8 @@ class Engine:
 
     @staticmethod
     def _resolve_ref(v):
-        """Resolve a credential reference to its actual value: `env:VAR` ->
-        environment, `file:/path` -> the file's contents (k8s/docker secret mounts).
-        Non-ref values pass through unchanged. These are the only schemes _CRED_REF_PREFIXES
-        advertises, so a ref left unresolved (and silently used as a literal token) can't
-        happen."""
-        if isinstance(v, str):
-            if v.startswith("env:"):
-                name = v[4:]
-                if name not in os.environ:
-                    raise ValueError(
-                        f"credential_ref {v!r}: environment variable {name} is not set"
-                    )
-                return os.environ[name]
-            if v.startswith("file:"):
-                try:
-                    with open(v[5:], encoding="utf-8") as f:
-                        return f.read().strip()
-                except OSError as e:
-                    raise ValueError(f"credential_ref {v!r}: cannot read secret file ({e})") from e
-            if v.startswith(("secret:", "vault:")):
-                # advertised-looking but unimplemented schemes must fail loudly, never be
-                # used as a literal credential token.
-                raise ValueError(
-                    f"credential_ref scheme {v.split(':', 1)[0]!r} is not implemented "
-                    f"(use env: or file:)"
-                )
-        return v
+        # 阶段 1：凭证引用解析已迁入 ``CredentialResolver``（框架解析凭证的唯一入口）。
+        return CredentialResolver.resolve(v)
 
     def _build_plugin(self, ctype: str, config: dict, connector_id: str):
         cls = get_plugin_cls(ctype)
@@ -1617,31 +1462,9 @@ class Engine:
 
     @staticmethod
     def _classify_error(e: Exception) -> str:
-        """Classify an embedding/provider error:
-          'auth'      — bad/unauthorized key (OpenAI 401 / AuthenticationError)
-          'quota'     — billing/quota exhausted (insufficient_quota / 402)
-          'retryable' — transient (429 rate-limit / 5xx / timeout)
-        'auth' and 'quota' are GLOBAL and non-retryable: a known-bad key or empty balance
-        fails identically for every object, so the caller aborts the whole job with the
-        documented embedding_auth_failed / embedding_quota_exceeded code instead of grinding
-        each object (and masking the run as a 0-indexed 'succeeded')."""
-        m = str(e).lower()
-        nm = type(e).__name__.lower()
-        auth_markers = (
-            "invalid_api_key",
-            "invalid x-api-key",
-            "authentication",
-            "unauthorized",
-            "permission denied",
-            "401",
-        )
-        if any(k in m for k in auth_markers) or "authentication" in nm or "permissiondenied" in nm:
-            return "auth"
-        # quota exhausted is distinct from a transient 429 rate-limit (which stays retryable):
-        # OpenAI signals it with insufficient_quota; 402 is payment-required.
-        if "insufficient_quota" in m or "402" in m:
-            return "quota"
-        return "retryable"
+        # 阶段 1：错误分类已迁入 ``ErrorClassifier``（components/worker.py）。保留薄委派
+        # 返回 ``.value`` 字符串，保持原 ``"auth"/"quota"/"retryable"`` 返回契约不变。
+        return ErrorClassifier.classify(e).value
 
     async def _process_with_retry(self, plugin, connector_uri: str, task: dict) -> str | None:
         """Returns None on success, 'fatal', 'retryable_exhausted', or 'skipped'.
@@ -1705,10 +1528,10 @@ class Engine:
                     # exponential backoff capped at backoff_max_ms: a flat
                     # initial-only sleep ignored backoff_max_ms entirely and hammered a
                     # rate-limited provider at a fixed cadence.
-                    delay_ms = min(
-                        self.cfg.object_task.backoff_initial_ms * (2**attempt),
+                    delay_ms = BackoffPolicy(
+                        self.cfg.object_task.backoff_initial_ms,
                         self.cfg.object_task.backoff_max_ms,
-                    )
+                    ).delay_ms(attempt)
                     await _a.sleep(delay_ms / 1000)
                     continue
                 await self.meta.execute(
@@ -2581,25 +2404,6 @@ class Engine:
         return {"entries": out, "capabilities": caps}
 
     @staticmethod
-    def _locator_matches(rec: dict, ocfg, idx: int, locator: dict) -> bool:
-        if "_row" in locator:
-            return idx == int(locator["_row"])
-        # "lines" is the framework-reserved key for body/code chunks and is never a
-        # structured-record PK — never compare it against the row. The cat router
-        # dispatches body-chunk reads through plugin.read(range=...) before reaching
-        # this helper, so seeing it here is a misconfiguration we just ignore.
-        keys = [k for k in (ocfg.locator_fields or list(locator.keys())) if k != "lines"]
-        present = [k for k in keys if k in locator]
-        # Require at least one recognized locator key: a locator that's empty or whose keys
-        # don't correspond to this object's locator_fields matches nothing. Without this guard
-        # `all([])` is True, so a bogus/typo'd locator silently returns record #0 instead of
-        # the documented locator_not_found.
-        if not present:
-            return False
-        # resolve with the SAME JSONPath-lite used to WRITE the locator (engine indexing:
-        # {f: resolve_path(rec, f)}); plain rec.get() couldn't reopen a nested locator key.
-        return all(str(resolve_path(rec, k)) == str(locator.get(k)) for k in present)
-
     async def cat(
         self,
         path: str,
@@ -2664,7 +2468,7 @@ class Engine:
                 # (e.g. asyncpg) leaks the connection and pool.close() later blocks ~60s.
                 async with aclosing(records):
                     async for rec in records:
-                        if self._locator_matches(rec, ocfg, i, locator):
+                        if locator_matches(rec, ocfg, i, locator):
                             return {
                                 "source": curi + rel,
                                 "locator": locator,
@@ -2767,7 +2571,7 @@ class Engine:
                 okind = plugin.object_kind_of(rel)
                 if okind not in ("document", "code"):
                     raise ValueError("density_unsupported")
-                return _density_view(text, ext, density)
+                return density_view(text, ext, density)
             return text
         finally:
             await plugin.close()
