@@ -189,10 +189,9 @@ class Engine:
         self.cfg = cfg
         self.ns = cfg.namespace
         self.meta = make_metadata_store(cfg)
-        # ObjectRepository owns all SQL for the objects/object_tasks/connector_jobs/
-        # connectors tables plus the task/job state machine (advance_task guard).
-        # Built after self.meta / self.ns are ready.
-        self.objects = ObjectRepository(self)
+        # ObjectRepository owns all SQL for the four tables + the advance_task guard.
+        # Inject the shared meta handle + cfg (namespace derived from cfg).
+        self.objects = ObjectRepository(self.meta, cfg)
         self.milvus = MilvusStore(cfg)
         self.artifact_cache = make_artifact_cache(cfg)
         self.tx_cache = make_transformation_cache(cfg)

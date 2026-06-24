@@ -98,10 +98,10 @@ class ObjectRepository:
     delegate methods called directly by tests.
     """
 
-    def __init__(self, engine):
-        self._engine = engine
-        self._meta = engine.meta
-        self._ns = engine.ns
+    def __init__(self, meta, cfg):
+        self._meta = meta
+        self._cfg = cfg
+        self._ns = cfg.namespace
 
     # ------------------------------------------------------------------
     # state machine — guarded per-task terminal transitions
@@ -299,7 +299,7 @@ class ObjectRepository:
             if "unique" in str(e).lower() or "constraint" in str(e).lower():
                 raise ValueError("sync_already_running") from e
             raise
-        await self.reclaim_tasks_for_reopen(job_id, cid, self._engine.cfg.object_task.max_retries)
+        await self.reclaim_tasks_for_reopen(job_id, cid, self._cfg.object_task.max_retries)
         return job_id
 
     async def set_job_state_snapshot(self, job_id: str, snapshot: str) -> None:
