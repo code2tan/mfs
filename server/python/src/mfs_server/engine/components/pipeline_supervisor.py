@@ -1,4 +1,4 @@
-"""``PipelineSupervisor`` — 进程单例 + Observer（阶段 0 脚手架）。
+"""``PipelineSupervisor`` — 进程单例 + Observer（阶段 3）。
 
 详见 `docs/engine-redesign.md` §4.5。per-`Engine` 实例的惰性单例（**非模块全局**），
 收口 ``_chunks_q`` / ``_embed_consumer`` / ``_producer_ctx`` / ``_job_lane`` /
@@ -6,18 +6,413 @@
 ``_gc_orphan_chunks`` + ``_recover_job_lane``。
 
 核心不变量（§5）：一个 chunk 在 Milvus 中存在 ⇔ 一条已提交的 `objects` 行指向它
-（`dir_summary` 是刻意的例外）。``_on_pipeline_object_indexed`` 是不可跨组件分割的
-原子方法体（claim→`won`-check→delete-or-write），阶段 3 迁入时方法体必须整体保留。
+（`dir_summary` 是刻意的例外）。``_on_object_indexed`` 是不可跨组件分割的原子方法体
+（claim→`won`-check→delete-or-write），方法体逻辑一字不改地自 `Engine` 迁入。
 
-阶段 0：`Engine` 仍直接持有上述可变字段并在 `_build_pipeline` 里惰性装配；本类仅
-占位，不持有状态。
+阶段 3 过渡态：本类持 ``engine`` 反向引用，经 ``self._engine.<client>`` 读取 meta /
+milvus / embed / tx_cache / converter / vlm / summary / artifact_cache（这样测试
+``eng.milvus = _FakeMilvus()`` 重赋值后仍能被本类观察到），并回调 engine 上的
+``_build_plugin`` / ``_put_artifact`` / ``_read_artifact*`` / ``_write_object_row``
+（这些在阶段 4/6 才迁出 Engine）。``Engine`` 上保留同名薄委派（被 ``tests/`` 直接调用）
++ 三个只读 property（``_pending_finalize`` / ``_embed_consumer`` / ``_job_lane``）转发到
+本类字段，供留在 Engine 的阶段 4 方法（``_drain_job`` / ``_finalize_job`` /
+``_process_with_retry`` / ``_run_job_loop``）只读访问。
 """
 
 from __future__ import annotations
 
+import asyncio
+import time
+
+from ..adapters import ArtifactStoreAdapter, EmbedderAdapter, MilvusSinkAdapter, TxCacheAdapter
+from ..job_lane import build_job_lane
+from ..job_watcher import ConnectorJobWatcher
+from ..pipeline import EmbedConsumer, TaskEnvelope, _EMBED_FLUSH_IDLE_MS, make_chunks_q
+from ..producers import select_producer
+from ..producers.base import (
+    DescriptionConcurrencyGate,
+    EndOfTask,
+    ObjectTask,
+    ProducerContext,
+    SummaryConcurrencyGate,
+    cap_content,
+)
+from ...storage.ids import chunk_id
+from .object_repository import TaskStatus
+
+
+class _PipelineEmbedConsumer(EmbedConsumer):
+    """EmbedConsumer wired for the real Milvus + embedding cache: supplies the embed cache key
+    (provider/model/version aware, shared with CachingEmbeddingClient) and the Milvus row shape
+    (chunk_id PK + namespace_id + indexed_at)."""
+
+    def __init__(self, *args, namespace_id: str, embed_key_fn, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._ns = namespace_id
+        self._embed_key_fn = embed_key_fn
+
+    def _cache_key(self, chunk) -> str:
+        return self._embed_key_fn(chunk.content)
+
+    def _build_row(self, env: TaskEnvelope, chunk, vec: list[float]) -> dict:
+        content, _ = cap_content(chunk.content)
+        loc = chunk.locator
+        return {
+            "chunk_id": chunk_id(self._ns, env.connector_uri, env.task_uri, chunk.chunk_kind, loc),
+            "namespace_id": self._ns,
+            "connector_uri": env.connector_uri,
+            "object_uri": env.task_uri,
+            "locator": loc,
+            "content": content,
+            "dense_vec": vec,
+            "chunk_kind": chunk.chunk_kind,
+            "metadata": chunk.metadata,
+            "indexed_at": int(time.time() * 1000),
+        }
+
 
 class PipelineSupervisor:
-    """阶段 0 空壳。阶段 3 收口进程单例字段与 `_pending_finalize`（三处 pop 一起迁）。"""
+    """per-Engine 实例的惰性单例（非模块全局）。收口进程级 pipeline 状态与生命周期。"""
+
+    # okinds always routed to the producer + chunks_q + EmbedConsumer path (§3.2). image and
+    # table_schema route conditionally (see routes_to_pipeline); everything else is
+    # metadata-only. dir_summary is not an object_task — the Job Lane owns it (§3.5).
+    _PIPELINE_OKINDS = ("document", "code", "message_stream", "record_collection", "table_rows")
 
     def __init__(self, engine):
         self._engine = engine
+        # --- process singletons (built lazily in _build_pipeline) ---
+        self._chunks_q: asyncio.Queue | None = None
+        self._embed_consumer: _PipelineEmbedConsumer | None = None
+        self._producer_ctx: ProducerContext | None = None
+        # full_uri -> (cid, relpath, stat, indexable, plugin, task_id) for pipeline-path objects
+        # whose objects-table row + object_tasks status are written by _on_object_indexed when
+        # the EmbedConsumer reports the task done.
+        self._pending_finalize: dict[str, tuple] = {}
+        self._embed_idle_ms = _EMBED_FLUSH_IDLE_MS
+        # Job Lane (dir_summary lane); built in _build_pipeline, inert when summary off.
+        self._job_lane = None
+        # ConnectorJobWatcher: out-of-band job completion / cancel / job-lane-evict (§5.7).
+        self._job_watcher = None
+        self._job_watcher_task: asyncio.Task | None = None
+        self._description_gate = None  # shared by Map producers + Job Lane SummaryWorker (§5.5)
+        self._summary_gate = None
+        self._started = False
+
+    # --- lifecycle ---
+
+    async def startup(self) -> None:
+        """build pipeline (idempotent) + startup GC + recover job lane + job watcher."""
+        self._build_pipeline()
+        await self._gc_orphan_chunks()
+        await self._recover_job_lane()
+        # ConnectorJobWatcher runs in this same event loop as the EmbedConsumer + SummaryWorker
+        # pool, finalizing jobs out-of-band (§5.7).
+        self._job_watcher = ConnectorJobWatcher(self._engine.meta, self._job_lane)
+        self._job_watcher_task = asyncio.create_task(self._job_watcher.run())
+        self._started = True
+
+    async def shutdown(self) -> None:
+        if self._job_watcher is not None:
+            self._job_watcher.stop()
+            if self._job_watcher_task is not None:
+                try:
+                    await self._job_watcher_task
+                except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                    pass
+            self._job_watcher = None
+        if self._job_lane is not None:
+            # stop the SummaryWorker pool first so no new dir chunks are produced, then
+            # drain whatever already reached the queue.
+            await self._job_lane.stop()
+        if self._embed_consumer is not None:
+            # drain the queue + flush the final batch before the loop closes, so an
+            # in-flight task's chunks aren't lost on shutdown.
+            await self._embed_consumer.shutdown()
+            self._embed_consumer = None
+
+    # --- process-singleton chunks_q + EmbedConsumer (§3.1 / §5.2) ---
+
+    def _build_pipeline(self) -> None:
+        """Construct the process-level chunks_q + EmbedConsumer + ProducerContext and start
+        the consumer draining in the background. Idempotent; called from startup() (and
+        lazily from pump so the pipeline path works even if a caller skipped startup). The
+        EmbedConsumer is shared across all jobs so embed batches fill across connectors
+        (§5.2)."""
+        if self._embed_consumer is not None:
+            return
+        eng = self._engine
+        batch_size = eng.cfg.embedding.batch_size
+        self._chunks_q = make_chunks_q(batch_size)
+        self._embed_consumer = _PipelineEmbedConsumer(
+            # raw provider embed (no caching) so the consumer's TxCacheAdapter is the single
+            # embed cache and there is no double-cache; cache key matches CachingEmbeddingClient.
+            EmbedderAdapter(eng.embed._embed_api),
+            MilvusSinkAdapter(eng.milvus, eng.ns),
+            TxCacheAdapter(
+                eng.tx_cache,
+                kind="embedding",
+                provider=eng.embed.provider_name,
+                model=eng.embed.model,
+                version=eng.embed.version,
+            ),
+            batch_size,
+            idle_ms=self._embed_idle_ms,
+            namespace_id=eng.ns,
+            embed_key_fn=eng.embed._key,
+        )
+        self._embed_consumer.register_on_succeeded(self._on_object_indexed)
+        # ONE description gate + ONE summary gate per process (§5.5), shared by BOTH the Map
+        # producers (image / table_schema) and the Job Lane SummaryWorker pool, so every VLM /
+        # summary provider call — wherever it originates — draws from the same in-flight budget
+        # ([description].concurrency / [summary].concurrency).
+        self._description_gate = DescriptionConcurrencyGate(eng.cfg.description.concurrency)
+        self._summary_gate = SummaryConcurrencyGate(eng.cfg.summary.concurrency)
+        self._producer_ctx = ProducerContext(
+            cfg=eng.cfg,
+            namespace_id=eng.ns,
+            artifacts=ArtifactStoreAdapter(
+                eng._put_artifact,
+                eng._read_artifact,
+                eng.artifact_cache.artifact_path,
+                eng._read_artifact_fresh,
+            ),
+            converter=eng.converter,
+            vlm=eng.vlm,
+            summary=eng.summary,
+            description_gate=self._description_gate,
+            summary_gate=self._summary_gate,
+        )
+        # Job Lane (§3.5): dir summaries emit into the SAME chunks_q. Its on_embed_succeeded
+        # is registered alongside the Object Lane per-task hook; it ignores file successes
+        # (files don't gate a dir) and counts a persisted directory_summary toward completion.
+        self._job_lane = build_job_lane(
+            eng.cfg,
+            tx_cache=eng.tx_cache,
+            summary=eng.summary,
+            vlm=eng.vlm,
+            converter=eng.converter,
+            chunks_q=self._chunks_q,
+            artifacts=self._producer_ctx.artifacts,
+            namespace_id=eng.ns,
+            description_gate=self._description_gate,
+            summary_gate=self._summary_gate,
+        )
+        self._embed_consumer.register_on_succeeded(self._job_lane.on_embed_succeeded)
+        self._embed_consumer.start(self._chunks_q)
+        self._job_lane.start()  # no-op unless cfg.summary.enabled
+
+    def routes_to_pipeline(self, okind: str) -> bool:
+        """Whether this okind goes through the producer -> chunks_q -> EmbedConsumer path.
+
+        document / code / message_stream / record_collection / table_rows always route
+        (_PIPELINE_OKINDS). image routes only when [description] is enabled — its
+        ImageChunksProducer makes a VLM call, so with it off the image is recorded metadata-only.
+        table_schema routes only when [summary] is enabled — its TableSchemaProducer makes a
+        summary LLM call; with it off the schema is metadata-only. dir_summary is not an
+        object_task at all — the Job Lane owns it (§3.5)."""
+        if okind in self._PIPELINE_OKINDS:
+            return True
+        if okind == "image":
+            return self._engine.cfg.description.enabled
+        if okind == "table_schema":
+            return self._engine.summary.enabled
+        return False
+
+    async def _gc_orphan_chunks(self) -> int:
+        """Startup reconcile: delete Milvus chunks that no committed `objects` row points at.
+
+        Orphans arise only in narrow windows — a consumer crash between chunk upsert and the
+        finalize hook, or chunks left before the per-object self-heal landed (see
+        _on_object_indexed). They are invisible to ls/inspect/cat (no objects row) yet still
+        match search, which queries Milvus directly.
+
+        Cost-guarded so a healthy index pays almost nothing: compare the Milvus row total
+        against the sum of committed chunk_counts (both scoped to non-summary chunks —
+        directory summaries have no objects row). They match unless there is genuine excess,
+        so the full distinct-object scan + per-object delete runs only when orphans exist."""
+        eng = self._engine
+        try:
+            total = await asyncio.to_thread(eng.milvus.count, eng.ns, eng.milvus.GC_SCOPE_EXPR)
+            if total == 0:
+                return 0
+            conns = await eng.objects.list_connectors_summary()
+            expected = 0
+            valid: set[str] = set()
+            for c in conns:
+                rows = await eng.objects.list_objects_with_chunks(c["id"])
+                for r in rows:
+                    expected += int(r["chunk_count"])
+                    valid.add(c["root_uri"] + r["object_uri"])
+            if total <= expected:
+                return 0  # healthy (or under-indexed, not an orphan case) — stop after the counts
+            # genuine excess: enumerate non-summary objects and drop those with no committed row
+            present = await asyncio.to_thread(eng.milvus.distinct_objects, eng.ns)
+            deleted = 0
+            for connector_uri, object_uri in present:
+                if object_uri not in valid:
+                    await asyncio.to_thread(
+                        eng.milvus.delete_by_object, eng.ns, connector_uri, object_uri
+                    )
+                    deleted += 1
+            if deleted:
+                print(
+                    f"mfs-server: startup GC purged {deleted} orphan object(s) from the index",
+                    flush=True,
+                )
+            return deleted
+        except Exception as e:  # noqa: BLE001
+            # Best-effort housekeeping; never block startup on it.
+            print(f"mfs-server: startup orphan GC skipped ({e})", flush=True)
+            return 0
+
+    async def _recover_job_lane(self) -> None:
+        """Rebuild the Job Lane's in-memory dir trees for jobs left 'running' by a
+        crash (§6.4.5). Best-effort: a per-job failure is logged and skipped, never blocking
+        boot. Already-written directory summaries are recomputed (idempotent + summary-cache
+        cheap) rather than queried back from Milvus."""
+        if self._job_lane is None or not self._job_lane.enabled:
+            return
+        import json as _json
+
+        # 延迟导入避免与 engine 模块的循环加载；常量仍由 engine 持有（阶段 4 _run_job 也用）。
+        from ..engine import _WORKER_CONNECT_TIMEOUT_S
+
+        eng = self._engine
+        try:
+            jobs = await eng.objects.list_running_jobs()
+        except Exception:  # noqa: BLE001 — recovery must never wedge startup
+            return
+        for job in jobs:
+            job_id, cid = job["id"], job["connector_id"]
+            try:
+                crow = await eng.objects.get_connector_root_type_config(cid)
+                if not crow:
+                    continue
+                connector_uri, ctype = crow["root_uri"], crow["type"]
+                stored_cfg = _json.loads(crow["config_json"]) if crow["config_json"] else {}
+                plugin, _ = eng._build_plugin(ctype, stored_cfg, cid)
+                await asyncio.wait_for(plugin.connect(), timeout=_WORKER_CONNECT_TIMEOUT_S)
+                rows = await eng.objects.list_job_tasks_excluding_dir_summary(job_id)
+                objects = [
+                    (r["object_uri"], plugin.object_kind_of(r["object_uri"]), r["status"])
+                    for r in rows
+                ]
+                self._job_lane.recover_job(job_id, connector_uri, plugin, objects, [])
+            except Exception as e:  # noqa: BLE001
+                print(
+                    f"mfs-server: WARNING Job Lane recovery for job {job_id} failed: {e}",
+                    flush=True,
+                )
+
+    async def _on_object_indexed(
+        self,
+        task_uri: str,
+        job_id: str | None,
+        chunk_count: int = 0,
+        partial: bool = False,
+        error: str | None = None,
+    ) -> None:
+        """EmbedConsumer finalize hook: write the `objects` row and set the object_tasks status
+        for a pipeline-path object — now that the EmbedConsumer knows its final chunk_count +
+        partial flag. When `error` is set the flush dropped this task's chunks: record it failed
+        (objects.search_status='failed', object_tasks.last_error) and do NOT advance the
+        connector cursor, so a later sync can retry. Skips tasks it has no stashed context for
+        (e.g. a Job Lane directory_summary success, which has no objects row).
+
+        原子方法体（§4.5/§5）：claim→won-check→delete-or-write 不可跨组件拆分。"""
+        eng = self._engine
+        ctx = self._pending_finalize.pop(task_uri, None)
+        if ctx is None:
+            return
+        cid, connector_uri, relpath, st, indexable, plugin, task_id = ctx
+        if error is not None:
+            # Embed/upsert failed for this object. Record it failed and leave the cursor where
+            # it was (on_object_indexed not called) so the object isn't treated as committed.
+            await eng._write_object_row(cid, relpath, st, indexable, "failed", chunk_count)
+            await eng.objects.advance_task(
+                task_id, TaskStatus.FAILED, error=str(error), from_status=TaskStatus.RUNNING
+            )
+            return
+        if chunk_count == 0:
+            search_status = "not_indexed"
+        elif partial:
+            search_status = "partial"
+        else:
+            search_status = "indexed"
+        # Claim completion FIRST, guarded on status='running'. Completion lives here, not in
+        # the worker loop: the pump enqueues chunks without blocking, so only the consumer
+        # knows when they have landed.
+        won = await eng.objects.advance_task(
+            task_id, TaskStatus.SUCCEEDED, from_status=TaskStatus.RUNNING
+        )
+        if won == 0:
+            # The task was cancelled out from under us while its chunks were embedding (an
+            # external `job cancel`, or a connector removal racing the shared consumer). We
+            # have already upserted this object's chunks to Milvus and no objects row will
+            # ever point at them — but search queries Milvus directly, so they would survive
+            # as orphan hits (un-inspectable, un-cat-able, yet matchable). Reconcile by
+            # deleting them, leaving the cursor untouched so a later sync re-does the object
+            # cleanly. No-op when chunk_count == 0.
+            await asyncio.to_thread(eng.milvus.delete_by_object, eng.ns, connector_uri, task_uri)
+            return
+        await eng._write_object_row(cid, relpath, st, indexable, search_status, chunk_count)
+        await plugin.on_object_indexed(relpath)
+
+    def stash_finalize(self, full_uri: str, ctx: tuple) -> None:
+        """Stash per-object finalize context for a pipeline-path object. 显式收口写点（§4.5）：
+        阶段 4 ``_index_object`` 经此或经 ``Engine._pending_finalize`` property 写入同一 dict。"""
+        self._pending_finalize[full_uri] = ctx
+
+    async def pump(
+        self, plugin, connector_uri: str, relpath: str, full_uri: str, okind: str, task: dict
+    ) -> None:
+        """Produce this object's chunks and forward them to the shared chunks_q, then return —
+        a non-blocking producer pump. Completion is async: the EmbedConsumer writes the chunks
+        (delete_by_object once on the first chunk, then upsert — the §6.1 per-object atomic
+        invariant) and fires the success hooks, which write the objects row + flip the
+        object_tasks status. The caller marks nothing for this task ('deferred')."""
+        if self._embed_consumer is None:
+            self._build_pipeline()
+        eng = self._engine
+        task_id = task["id"]
+        job_id = task.get("connector_job_id")
+        producer = select_producer(okind, self._producer_ctx)
+        try:
+            if producer is None:
+                # unreachable for routed okinds; emit a bare EndOfTask so the consumer finalizes
+                # (zero-chunk) and the success hook still writes the metadata-only objects row.
+                await self._chunks_q.put(
+                    TaskEnvelope(task_id, full_uri, connector_uri, job_id, EndOfTask())
+                )
+            else:
+                otask = ObjectTask(
+                    object_uri=relpath,
+                    connector_uri=connector_uri,
+                    okind=okind,
+                    change_kind=task["change_kind"],
+                    connector_job_id=job_id,
+                    task_id=task_id,
+                    plugin=plugin,
+                    ocfg=plugin.ctx.object_config_for(relpath),
+                )
+                async for item in producer.produce(otask):
+                    await self._chunks_q.put(
+                        TaskEnvelope(task_id, full_uri, connector_uri, job_id, item)
+                    )
+        except Exception:
+            # produce() failed before all chunks were enqueued: drop the stashed finalize
+            # context so no objects row is written, then re-raise for _process_with_retry.
+            self._pending_finalize.pop(full_uri, None)
+            raise
+        finally:
+            if okind == "message_stream":
+                # GC the per-task raw_records jsonl the MessageStreamProducer materialized
+                # (§5.4): only needed to regroup messages by thread during produce(), which is
+                # done once the produce loop above exhausts. Runs on success AND failure.
+                try:
+                    await asyncio.to_thread(
+                        eng.artifact_cache.delete_artifact, eng.ns, full_uri, "raw_records"
+                    )
+                except Exception:  # noqa: BLE001 — GC of a temp artifact must never fail the task
+                    pass
