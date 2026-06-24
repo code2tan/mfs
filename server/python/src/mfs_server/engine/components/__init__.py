@@ -31,7 +31,12 @@ from .connector_factory import (
 )
 from .ingest import IngestOrchestrator
 from .infra import InfraStack
-from .object_repository import ObjectRepository
+from .object_repository import (
+    ConnectorStatus,
+    JobStatus,
+    ObjectRepository,
+    TaskStatus,
+)
 from .pipeline_supervisor import PipelineSupervisor
 from .reads import ReadService
 from .upload import UploadService
@@ -41,6 +46,7 @@ __all__ = [
     "ArtifactCacheService",
     "BackoffPolicy",
     "ConnectorManager",
+    "ConnectorStatus",
     "ConnectorFactory",
     "CredentialRedactor",
     "CredentialResolver",
@@ -48,11 +54,13 @@ __all__ = [
     "ErrorClassifier",
     "IngestOrchestrator",
     "InfraStack",
+    "JobStatus",
     "ObjectRepository",
     "PipelineSupervisor",
     "ReadService",
     "TargetResolution",
     "TargetResolver",
+    "TaskStatus",
     "UploadService",
     "WorkerScheduler",
 ]
