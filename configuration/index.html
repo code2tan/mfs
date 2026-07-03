@@ -1,0 +1,3232 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Multi-source File-like Search for agents and developers, powered by Milvus">
+      
+      
+      
+        <link rel="canonical" href="https://zilliztech.github.io/mfs/configuration/">
+      
+      
+        <link rel="prev" href="../integrations/langgraph/">
+      
+      
+        <link rel="next" href="../auth-and-secrets/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Configuration - MFS</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=JetBrains+Mono:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"JetBrains Mono";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/terminal.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#configuration" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="MFS" class="md-header__button md-logo" aria-label="MFS" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            MFS
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Configuration
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/zilliztech/mfs" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zilliztech/mfs
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href=".." class="md-tabs__link">
+          
+  
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../architecture/" class="md-tabs__link">
+          
+  
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../connectors/" class="md-tabs__link">
+          
+  
+  
+  Connectors
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../integrations/" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../cli/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../evaluation/" class="md-tabs__link">
+          
+  
+  
+  Project
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="MFS" class="md-nav__button md-logo" aria-label="MFS" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    MFS
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/zilliztech/mfs" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    zilliztech/mfs
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_1" id="__nav_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../why/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why MFS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../production/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design philosophy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../one-model-many-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    One model, many sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../robustness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Robustness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../search-and-browse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search and browse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ingest-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ingest pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../caching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Caching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connectors
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Connectors
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/file/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    file
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    web
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/github/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    github
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/postgres/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    postgres
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/mysql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    mysql
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/mongo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    mongo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/slack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    slack
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/discord/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    discord
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/gmail/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    gmail
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/notion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    notion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/jira/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    jira
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/linear/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    linear
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/zendesk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    zendesk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/hubspot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    hubspot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/bigquery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bigquery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/snowflake/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    snowflake
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/s3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    s3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/gdrive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    gdrive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/feishu/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feishu
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/open-tag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open Tag (Slack bot)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/mcp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/langchain/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LangChain
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/langgraph/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LangGraph
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#server-config-lookup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Server Config Lookup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#files-under-mfs_home" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files Under MFS_HOME
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setup-wizard-sections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setup Wizard Sections
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#default-local-backends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Default Local Backends
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tuning-embedding-for-low-ram-machines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tuning Embedding for Low-RAM Machines
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#auth-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auth Modes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment-overrides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment Overrides
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cli-endpoint-and-token-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI Endpoint and Token Resolution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#minimal-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minimal Examples
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../auth-and-secrets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Auth and secrets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Providers and processing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../storage-and-backup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage and backup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTP API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sdks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDKs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../skills/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent skills
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error codes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Server internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Status and limits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#server-config-lookup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Server Config Lookup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#files-under-mfs_home" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files Under MFS_HOME
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setup-wizard-sections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setup Wizard Sections
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#default-local-backends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Default Local Backends
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tuning-embedding-for-low-ram-machines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tuning Embedding for Low-RAM Machines
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#auth-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auth Modes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment-overrides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment Overrides
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cli-endpoint-and-token-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI Endpoint and Token Resolution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#minimal-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minimal Examples
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h1>
+<p>MFS has two configuration surfaces:</p>
+<ul>
+<li>the Python server configures storage, embeddings, auth, indexing, and cache
+  backends;</li>
+<li>the Rust CLI configures the target endpoint, client identity, profiles, and
+  bearer token source.</li>
+</ul>
+<p>Use this page when you need to answer "which value wins?" before changing a
+deployment. For first-run commands, start with <a href="../getting-started/">Quickstart</a>.
+For a compact process-to-token map and first auth recovery commands, see
+<a href="../auth-and-secrets/">Auth and Secrets</a>.
+For container and Helm topology details, see <a href="../deployment/">Deployment</a>.
+For embedding, summary, VLM, and conversion provider choices, see
+<a href="../providers/">Providers and Processing</a>.
+For backup, restore, and safe reset boundaries, see
+<a href="../storage-and-backup/">Storage and Backup</a>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>mfs CLI
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  endpoint: MFS_API_URL -&gt; active profile -&gt; http://127.0.0.1:13619
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  token:    MFS_API_TOKEN -&gt; active profile token -&gt; $MFS_HOME/server.token
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>      |
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>      v
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>mfs-server /v1
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  config: --config -&gt; MFS_SERVER_CONFIG -&gt; ./server.toml
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>          -&gt; $MFS_HOME/server.toml -&gt; ~/.mfs/server.toml
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>          -&gt; /etc/mfs/server.toml -&gt; built-in defaults
+</code></pre></div>
+<h2 id="server-config-lookup">Server Config Lookup<a class="headerlink" href="#server-config-lookup" title="Permanent link">&para;</a></h2>
+<p><code>mfs-server run</code>, <code>mfs-server api</code>, <code>mfs-server worker</code>, and <code>mfs-server reload</code>
+load server settings through <code>load_server_config</code>. The first existing file in
+this chain wins:</p>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Source</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>--config PATH</code></td>
+<td>Supported by <code>mfs-server run</code>, <code>api</code>, <code>worker</code>, and <code>reload</code>.</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>MFS_SERVER_CONFIG</code></td>
+<td>Server-side environment override for the config file path.</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>./server.toml</code></td>
+<td>Relative to the current working directory of the server process.</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>$MFS_HOME/server.toml</code></td>
+<td>Checked when <code>MFS_HOME</code> is set. This is the wizard's default write target.</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>~/.mfs/server.toml</code></td>
+<td>Default user-level server config when <code>MFS_HOME</code> is not set.</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>/etc/mfs/server.toml</code></td>
+<td>System-level fallback.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>built-in defaults</td>
+<td>Local ONNX, Milvus Lite, SQLite, local artifact cache, auth token bootstrap.</td>
+</tr>
+</tbody>
+</table>
+<p><code>MFS_HOME</code> defaults to <code>~/.mfs</code>. The server creates that directory when it
+resolves config defaults.</p>
+<div class="admonition note">
+<p class="admonition-title">Environment overrides still apply</p>
+<p>After the server loads TOML and resolves default paths, selected environment
+variables can override runtime fields. See <a href="#environment-overrides">Environment Overrides</a>.</p>
+</div>
+<h2 id="files-under-mfs_home">Files Under <code>MFS_HOME</code><a class="headerlink" href="#files-under-mfs_home" title="Permanent link">&para;</a></h2>
+<p>The same root is used by the local server and local CLI defaults. In a source
+run it defaults to <code>~/.mfs</code>; the Docker image and Compose setup use <code>/data</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Owner</th>
+<th>Created by</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>$MFS_HOME/server.toml</code></td>
+<td>Server</td>
+<td><code>mfs-server setup</code> by default</td>
+<td>Server backend, auth, cache, embedding, and search settings.</td>
+</tr>
+<tr>
+<td><code>$MFS_HOME/server.token</code></td>
+<td>Server and local CLI</td>
+<td><code>mfs-server setup</code> in auto auth mode, or <code>mfs-server run</code> / <code>api</code> when no token exists</td>
+<td>Bearer token for local CLI fallback and direct HTTP clients that can read it.</td>
+</tr>
+<tr>
+<td><code>$MFS_HOME/client.toml</code></td>
+<td>CLI</td>
+<td><code>mfs profile add</code>, <code>mfs profile use</code>, or first <code>client_id</code> generation</td>
+<td>Active profile, profile endpoints, profile tokens, and stable client id.</td>
+</tr>
+<tr>
+<td><code>$MFS_HOME/metadata.db</code></td>
+<td>Server</td>
+<td>Server defaults when SQLite is used</td>
+<td>Connector registry, object metadata, jobs, and related metadata.</td>
+</tr>
+<tr>
+<td><code>$MFS_HOME/transformation_cache.db</code></td>
+<td>Server</td>
+<td>Server defaults when SQLite transformation cache is used</td>
+<td>Transformation-cache lookup table.</td>
+</tr>
+<tr>
+<td><code>$MFS_HOME/cache</code></td>
+<td>Server</td>
+<td>Server defaults when local artifact cache is used</td>
+<td>Derived artifact blobs such as converted document text and structured head previews.</td>
+</tr>
+<tr>
+<td><code>$MFS_HOME/milvus.db</code></td>
+<td>Server</td>
+<td>Server defaults when no remote Milvus URI is configured</td>
+<td>Milvus Lite vector database.</td>
+</tr>
+<tr>
+<td><code>$MFS_HOME/onnx-cache/</code></td>
+<td>Server embedding provider</td>
+<td>First local ONNX server/worker startup, or setup dimension probe</td>
+<td>Cached ONNX model files for <code>gpahal/bge-m3-onnx-int8</code>.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">Persist this directory</p>
+<p>In containers, mount <code>/data</code> to a durable volume. Otherwise the server
+loses SQLite state, Milvus Lite data, caches, and the generated bearer
+token when the container is removed.</p>
+</div>
+<h2 id="setup-wizard-sections">Setup Wizard Sections<a class="headerlink" href="#setup-wizard-sections" title="Permanent link">&para;</a></h2>
+<p>Run the full server wizard:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>mfs-server<span class="w"> </span>setup
+</code></pre></div>
+<p>Run a single section later:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>mfs-server<span class="w"> </span>setup<span class="w"> </span>--section<span class="w"> </span>embedding
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>mfs-server<span class="w"> </span>setup<span class="w"> </span>--section<span class="w"> </span>auth
+</code></pre></div>
+<p>Write and run a specific config file:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>mfs-server<span class="w"> </span>setup<span class="w"> </span>--config<span class="w"> </span>/tmp/mfs-server.toml
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>mfs-server<span class="w"> </span>run<span class="w"> </span>--config<span class="w"> </span>/tmp/mfs-server.toml
+</code></pre></div>
+<p>The wizard walks these sections in order:</p>
+<table>
+<thead>
+<tr>
+<th>Section</th>
+<th>TOML fields</th>
+<th>Default behavior</th>
+<th>When to change it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>embedding</code></td>
+<td><code>[embedding] provider</code>, <code>model</code>, <code>dim</code></td>
+<td>Local ONNX provider, <code>gpahal/bge-m3-onnx-int8</code>, 1024 dimensions.</td>
+<td>Use hosted or local alternatives when you have the required extra dependencies and credentials.</td>
+</tr>
+<tr>
+<td><code>milvus</code></td>
+<td><code>[milvus] uri</code>, <code>token</code></td>
+<td>Milvus Lite under <code>$MFS_HOME/milvus.db</code>.</td>
+<td>Set an HTTP(S) URI for Milvus or Zilliz Cloud.</td>
+</tr>
+<tr>
+<td><code>database</code></td>
+<td><code>[database] backend</code>, <code>dsn</code></td>
+<td>SQLite. The same backend feeds metadata and the transformation-cache lookup table.</td>
+<td>Use Postgres when multiple server processes need shared relational state.</td>
+</tr>
+<tr>
+<td><code>cache</code></td>
+<td><code>[artifact_cache] root</code>, <code>max_size_gb</code>, <code>eviction</code></td>
+<td>Local filesystem under <code>$MFS_HOME/cache</code>.</td>
+<td>Mount a volume at <code>root</code> to persist the cache in container deployments.</td>
+</tr>
+<tr>
+<td><code>auth</code></td>
+<td>top-level <code>auth_token</code></td>
+<td>Auto mode omits <code>auth_token</code> in TOML and creates or reuses <code>server.token</code>.</td>
+<td>Provide a known token, or set <code>-</code> only for an intentionally open trusted network.</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>[description] enabled</code>, <code>provider</code>, <code>model</code></td>
+<td>Off by default. Images are listed without running a vision LLM to describe them.</td>
+<td>Enable when you want images described and made searchable, and accept the per-image provider cost. The operation is on images only.</td>
+</tr>
+<tr>
+<td><code>summary</code></td>
+<td><code>[summary] enabled</code>, <code>provider</code>, <code>model</code>, <code>dir</code>, <code>file</code>, <code>include_image_description</code></td>
+<td>Off by default. No directory or file summaries are produced.</td>
+<td>Enable to get LLM summaries of directories. <code>dir</code> covers directories (recommended); set <code>file = true</code> to also summarize each file (~2x cost). <code>include_image_description</code> folds image-description text into a directory's summary, and only has an effect when <code>description</code> is enabled.</td>
+</tr>
+</tbody>
+</table>
+<details class="note">
+<summary>Advanced and legacy TOML blocks</summary>
+<p><code>metadata.backend</code> / <code>metadata.dsn</code> and <code>transformation_cache.backend</code> /
+<code>transformation_cache.dsn</code> can override the unified <code>[database]</code> block for
+power users. Existing legacy TOML that used older <code>[metadata]</code>,
+<code>[transformation_cache]</code>, or <code>[object_store]</code> blocks is migrated in memory
+when the server loads config.</p>
+</details>
+<h2 id="default-local-backends">Default Local Backends<a class="headerlink" href="#default-local-backends" title="Permanent link">&para;</a></h2>
+<p>With no TOML file and no runtime overrides, the server resolves to local
+backends:</p>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Home</td>
+<td><code>~/.mfs</code>, unless <code>MFS_HOME</code> is set.</td>
+</tr>
+<tr>
+<td>API bind address</td>
+<td><code>127.0.0.1:13619</code> for <code>mfs-server run</code> and <code>api</code>.</td>
+</tr>
+<tr>
+<td>Namespace</td>
+<td><code>default</code>.</td>
+</tr>
+<tr>
+<td>Embedding</td>
+<td>ONNX provider, <code>gpahal/bge-m3-onnx-int8</code>, 1024 dimensions, batch size 100.</td>
+</tr>
+<tr>
+<td>VLM and summaries</td>
+<td>Directory summaries and image descriptions are off by default.</td>
+</tr>
+<tr>
+<td>Vector database</td>
+<td>Milvus Lite at <code>$MFS_HOME/milvus.db</code>.</td>
+</tr>
+<tr>
+<td>Database</td>
+<td>SQLite for metadata and the transformation-cache lookup table.</td>
+</tr>
+<tr>
+<td>Metadata SQLite path</td>
+<td><code>$MFS_HOME/metadata.db</code>.</td>
+</tr>
+<tr>
+<td>Transformation cache SQLite path</td>
+<td><code>$MFS_HOME/transformation_cache.db</code>.</td>
+</tr>
+<tr>
+<td>Artifact cache</td>
+<td>Local filesystem at <code>$MFS_HOME/cache</code>, <code>max_size_gb = 10.0</code>, <code>eviction = "lru"</code>.</td>
+</tr>
+<tr>
+<td>Job runner</td>
+<td><code>[server] in_process_jobrunner = true</code>, <code>[chunks_producer] concurrency = 8</code>, <code>[object_task] max_retries = 3</code>.</td>
+</tr>
+<tr>
+<td>Chunking</td>
+<td><code>[chunking] chunk_size = 2048</code>, <code>default_chunk_max = 1000000</code>.</td>
+</tr>
+<tr>
+<td>Search</td>
+<td><code>over_fetch_ratio = 3</code>, <code>max_partitions_per_query = 32</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="tuning-embedding-for-low-ram-machines">Tuning Embedding for Low-RAM Machines<a class="headerlink" href="#tuning-embedding-for-low-ram-machines" title="Permanent link">&para;</a></h2>
+<p>The embedder processes chunks in batches, and the whole batch is held in memory
+while the model runs. The defaults are tuned for a machine with roughly 8 GB of
+RAM running the local ONNX <code>bge-m3</code> model:</p>
+<ul>
+<li><code>[embedding] batch_size = 100</code> — how many chunks are embedded per model call.</li>
+<li><code>[chunking] chunk_size = 2048</code> — the target (and hard cap) size of a single chunk.</li>
+</ul>
+<p>On a smaller machine a large batch of large chunks can exhaust memory. When that
+happens the failing object's task is recorded as <code>failed</code> and its <code>last_error</code>
+mentions the underlying cause — typically something like <code>memory</code>, <code>allocation</code>,
+<code>killed</code>, or <code>OOM</code>. The job still reaches a terminal state (it does not hang), and
+the other objects in the run continue.</p>
+<p>If you see such failures:</p>
+<ol>
+<li>Lower <code>[embedding] batch_size</code> — try <code>30</code>, then <code>10</code>.</li>
+<li>If a single very long chunk still fails repeatedly, also lower
+   <code>[chunking] chunk_size</code> (for example to <code>1024</code> or <code>512</code>).</li>
+<li>Re-index the affected connector so the failed objects are retried:
+   <code>mfs add &lt;target&gt; --force-index</code>.</li>
+</ol>
+<p>Inspect a job's per-object failures and their <code>last_error</code> with
+<code>mfs job show &lt;job_id&gt;</code>, or check the aggregate counts with <code>mfs status</code>.</p>
+<p>On a memory-tight host a large sync can push total usage past the limit and the
+kernel terminates the whole <code>mfs-server</code> process rather than failing a single
+object. Alongside <code>batch_size</code> / <code>chunk_size</code>, the levers that lower peak memory
+are:</p>
+<ul>
+<li>Lower <code>[chunks_producer] concurrency</code> (default <code>8</code>) — fewer objects held in
+  memory and processed in parallel.</li>
+<li>Run a Milvus backend other than Lite (Standalone / Cluster / Cloud), so the
+  vector store uses its own memory instead of the server process's.</li>
+<li>Narrow each sync with the connector's <code>max_read_rows</code>, scope, or <code>--since</code>.</li>
+</ul>
+<h2 id="auth-modes">Auth Modes<a class="headerlink" href="#auth-modes" title="Permanent link">&para;</a></h2>
+<p><code>/v1</code> endpoints require <code>Authorization: Bearer &lt;token&gt;</code> when <code>auth_token</code> is
+configured. <code>GET /healthz</code> is exempt so health probes work without secrets.</p>
+<table>
+<thead>
+<tr>
+<th>Server-side mode</th>
+<th>How to configure</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Auto token</td>
+<td>Omit <code>auth_token</code> in <code>server.toml</code>, or choose auto in the wizard.</td>
+<td><code>mfs-server setup</code> or <code>mfs-server run</code> / <code>api</code> creates or reuses <code>$MFS_HOME/server.token</code>.</td>
+</tr>
+<tr>
+<td>Known token</td>
+<td>Set <code>auth_token = "..."</code> in TOML, or set <code>MFS_API_TOKEN</code> in the server environment.</td>
+<td>The server expects that token on <code>/v1</code> requests.</td>
+</tr>
+<tr>
+<td>Explicitly open</td>
+<td>Set <code>auth_token = "-"</code> in TOML.</td>
+<td><code>mfs-server run</code> / <code>api</code> converts it to no auth. Use only for trusted or isolated networks.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">Token names have client and server meanings</p>
+<p><code>MFS_API_TOKEN</code> is both a server-side runtime override for <code>auth_token</code> and
+the CLI's highest-priority bearer token source. For remote or container
+servers, set the same value on the server and on every client that should
+call <code>/v1</code>.</p>
+</div>
+<h2 id="environment-overrides">Environment Overrides<a class="headerlink" href="#environment-overrides" title="Permanent link">&para;</a></h2>
+<p>These variables are read by the current server or CLI code. Runtime overrides
+apply after TOML is loaded and default paths are resolved.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Read by</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MFS_HOME</code></td>
+<td>Server and CLI</td>
+<td>Sets the root for <code>server.toml</code>, <code>server.token</code>, <code>client.toml</code>, SQLite files, local cache, Milvus Lite, and ONNX cache.</td>
+</tr>
+<tr>
+<td><code>MFS_SERVER_CONFIG</code></td>
+<td>Server</td>
+<td>Adds a config-file lookup path after <code>--config</code>.</td>
+</tr>
+<tr>
+<td><code>MFS_API_TOKEN</code></td>
+<td>Server and CLI</td>
+<td>Server: overrides <code>auth_token</code>. CLI: highest-priority bearer token source.</td>
+</tr>
+<tr>
+<td><code>MFS_API_URL</code></td>
+<td>CLI</td>
+<td>Highest-priority endpoint source.</td>
+</tr>
+<tr>
+<td><code>MFS_SUMMARY_ENABLED</code></td>
+<td>Server</td>
+<td>Sets <code>summary.enabled</code>. Truthy values are <code>1</code>, <code>true</code>, <code>yes</code>, and <code>on</code>.</td>
+</tr>
+<tr>
+<td><code>MILVUS_URI</code></td>
+<td>Server</td>
+<td>Primary Milvus or Zilliz Cloud URI override.</td>
+</tr>
+<tr>
+<td><code>MILVUS_TOKEN</code></td>
+<td>Server</td>
+<td>Primary Milvus or Zilliz token override.</td>
+</tr>
+<tr>
+<td><code>ZILLIZ_URI</code></td>
+<td>Server</td>
+<td>Fallback URI when <code>MILVUS_URI</code> is unset.</td>
+</tr>
+<tr>
+<td><code>ZILLIZ_TOKEN</code></td>
+<td>Server</td>
+<td>Fallback token when <code>MILVUS_TOKEN</code> is unset.</td>
+</tr>
+<tr>
+<td><code>ZILLIZ_API_KEY</code></td>
+<td>Server</td>
+<td>Additional fallback token when <code>MILVUS_TOKEN</code> and <code>ZILLIZ_TOKEN</code> are unset.</td>
+</tr>
+<tr>
+<td><code>MFS_METADATA_DSN</code></td>
+<td>Server</td>
+<td>Switches the unified database backend to Postgres and applies the DSN to metadata.</td>
+</tr>
+<tr>
+<td><code>MFS_TX_CACHE_DSN</code></td>
+<td>Server</td>
+<td>Optional transformation-cache Postgres DSN.</td>
+</tr>
+<tr>
+<td><code>MFS_TX_CACHE_PG</code></td>
+<td>Server</td>
+<td>Enables Postgres for transformation cache when paired with <code>MFS_TX_CACHE_DSN</code> or <code>MFS_METADATA_DSN</code>.</td>
+</tr>
+<tr>
+<td><code>OPENAI_API_KEY</code></td>
+<td>OpenAI provider SDK</td>
+<td>Needed only when OpenAI-backed embedding, summary, or VLM settings are selected. The default ONNX path does not require it.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">Do not use <code>MFS_MILVUS_*</code> as runtime overrides</p>
+<p>Some deployment assets mention <code>MFS_MILVUS_URI</code> and <code>MFS_MILVUS_TOKEN</code>.
+The current server configuration code does not read those names. Use
+<code>MILVUS_URI</code> / <code>MILVUS_TOKEN</code>, <code>ZILLIZ_URI</code> / <code>ZILLIZ_TOKEN</code>, or
+<code>server.toml</code> until the deployment assets and runtime config are aligned.</p>
+</div>
+<h2 id="cli-endpoint-and-token-resolution">CLI Endpoint and Token Resolution<a class="headerlink" href="#cli-endpoint-and-token-resolution" title="Permanent link">&para;</a></h2>
+<p>The CLI stores profiles in <code>$MFS_HOME/client.toml</code>.</p>
+<p>Endpoint precedence:</p>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Source</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>MFS_API_URL</code></td>
+<td>Use for one-off shells, containers, CI, or scripts.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>active profile URL in <code>$MFS_HOME/client.toml</code></td>
+<td>Managed by <code>mfs profile add</code> and <code>mfs profile use</code>.</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>http://127.0.0.1:13619</code></td>
+<td>Default local server endpoint.</td>
+</tr>
+</tbody>
+</table>
+<p>Bearer token precedence:</p>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Source</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>non-empty <code>MFS_API_TOKEN</code></td>
+<td>Wins over profile tokens and local token files.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>active profile token</td>
+<td>May be a literal token or <code>env:VAR</code>; if <code>env:VAR</code> resolves empty, no token is sent from that profile.</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>$MFS_HOME/server.token</code></td>
+<td>Local same-host fallback for the auto-generated server token.</td>
+</tr>
+</tbody>
+</table>
+<p>Create a persistent remote profile:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>mfs<span class="w"> </span>profile<span class="w"> </span>add<span class="w"> </span>prod<span class="w"> </span>https://mfs.example.com<span class="w"> </span>--token<span class="w"> </span>env:MFS_API_TOKEN
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>mfs<span class="w"> </span>profile<span class="w"> </span>use<span class="w"> </span>prod
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>mfs<span class="w"> </span>config<span class="w"> </span>show
+</code></pre></div>
+<p>A generated client config uses TOML tables like this:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">active</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;prod&quot;</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">client_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;generated-on-first-use&quot;</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="k">[profiles.prod]</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;https://mfs.example.com&quot;</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="n">token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;env:MFS_API_TOKEN&quot;</span>
+</code></pre></div>
+<p><code>mfs config show</code> prints the resolved endpoint, active profile, stable
+<code>client_id</code>, and whether <code>/v1/server/info</code> is reachable.</p>
+<div class="admonition note">
+<p class="admonition-title">Remote paths and upload mode</p>
+<p>The CLI treats non-loopback endpoints as remote. For local paths, it may
+rewrite browse/search paths to the uploaded connector identity. For
+practical host-versus-container examples, see <a href="../deployment/">Deployment</a>
+and <a href="../troubleshooting/">Troubleshooting</a>.</p>
+</div>
+<h2 id="minimal-examples">Minimal Examples<a class="headerlink" href="#minimal-examples" title="Permanent link">&para;</a></h2>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:4"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><input id="__tabbed_1_4" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Local defaults</label><label for="__tabbed_1_2">Known token</label><label for="__tabbed_1_3">Remote Milvus</label><label for="__tabbed_1_4">Postgres metadata</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>mfs-server
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>mfs-server<span class="w"> </span>setup
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>mfs-server<span class="w"> </span>run
+</code></pre></div>
+<p>In another terminal:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>mfs<span class="w"> </span>status
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>mfs<span class="w"> </span>config<span class="w"> </span>show
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MFS_API_TOKEN</span><span class="o">=</span><span class="s2">&quot;replace-with-a-shared-token&quot;</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>mfs-server<span class="w"> </span>run
+</code></pre></div>
+<p>On clients:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MFS_API_URL</span><span class="o">=</span>http://127.0.0.1:13619
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MFS_API_TOKEN</span><span class="o">=</span><span class="s2">&quot;replace-with-a-shared-token&quot;</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>mfs<span class="w"> </span>status
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MILVUS_URI</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$ZILLIZ_URI</span><span class="s2">&quot;</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MILVUS_TOKEN</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$ZILLIZ_TOKEN</span><span class="s2">&quot;</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>mfs-server<span class="w"> </span>run
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MFS_METADATA_DSN</span><span class="o">=</span><span class="s2">&quot;postgresql://user:pass@host:5432/mfs&quot;</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>mfs-server<span class="w"> </span>run
+</code></pre></div>
+</div>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.top", "search.highlight", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
