@@ -12,13 +12,14 @@
 # The api/worker split + Postgres metadata + a shared cache volume is the team /
 # client-server target; the Postgres metadata backend is wired (MFS_METADATA_DSN),
 # the standalone worker daemon lands post-v0.4. Sketch at the bottom (disabled).
+name: mfs
 services:
   mfs-server:
     build:
       context: ../..
       dockerfile: deployments/docker/Dockerfile
     image: mfs-server:0.4.5
-    command: ["run", "--bind", "0.0.0.0:13619"]
+    command: [ "run", "--bind", "0.0.0.0:13619" ]
     environment:
       MFS_HOME: /data
       # Milvus Lite is the default at /data/milvus.db. Do not put a Lite file
@@ -32,12 +33,12 @@ services:
       # so host CLIs can authenticate; if empty the server auto-generates one at
       # /data/server.token (read via: docker compose exec mfs-server cat /data/server.token).
       MFS_API_TOKEN: ${MFS_API_TOKEN:-}
-    ports: ["13619:13619"]
+    ports: [ "13619:13619" ]
     volumes:
       - mfs-data:/data          # SQLite metadata + cache + (Lite) milvus.db — persist!
     healthcheck:
       # send the Bearer token (explicit MFS_API_TOKEN, else the auto-generated server.token)
-      test: ["CMD", "python", "-c", "import urllib.request,sys,os; tok=os.environ.get('MFS_API_TOKEN') or (open('/data/server.token').read().strip() if os.path.exists('/data/server.token') else ''); req=urllib.request.Request('http://127.0.0.1:13619/v1/server/info', headers={'Authorization':'Bearer '+tok} if tok else {}); sys.exit(0 if urllib.request.urlopen(req).status==200 else 1)"]
+      test: [ "CMD", "python", "-c", "import urllib.request,sys,os; tok=os.environ.get('MFS_API_TOKEN') or (open('/data/server.token').read().strip() if os.path.exists('/data/server.token') else ''); req=urllib.request.Request('http://127.0.0.1:13619/v1/server/info', headers={'Authorization':'Bearer '+tok} if tok else {}); sys.exit(0 if urllib.request.urlopen(req).status==200 else 1)" ]
       interval: 10s
       timeout: 5s
       retries: 5
