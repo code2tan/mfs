@@ -201,23 +201,20 @@ apply after TOML is loaded and default paths are resolved.
 | `MFS_API_TOKEN` | Server and CLI | Server: overrides `auth_token`. CLI: highest-priority bearer token source. |
 | `MFS_API_URL` | CLI | Highest-priority endpoint source. |
 | `MFS_SUMMARY_ENABLED` | Server | Sets `summary.enabled`. Truthy values are `1`, `true`, `yes`, and `on`. |
-| `MFS_MILVUS_URI` | Server | Primary Milvus URI override - may be a Lite local path or a remote endpoint. |
-| `MFS_MILVUS_TOKEN` | Server | Primary Milvus token override. |
-| `MILVUS_URI` | Server | Remote Milvus/Zilliz URI override. pymilvus reads `MILVUS_URI` at import and rejects local paths - use `MFS_MILVUS_URI` for Lite. |
-| `MILVUS_TOKEN` | Server | Remote Milvus/Zilliz token override. |
-| `ZILLIZ_URI` | Server | Fallback URI when `MFS_MILVUS_URI`/`MILVUS_URI` are unset. |
-| `ZILLIZ_TOKEN` | Server | Fallback token when `MFS_MILVUS_TOKEN`/`MILVUS_TOKEN` are unset. |
-| `ZILLIZ_API_KEY` | Server | Additional fallback token when the above are unset. |
+| `MILVUS_URI` | Server | Primary remote Milvus or Zilliz Cloud URI override. Do not use a Milvus Lite file path. |
+| `MILVUS_TOKEN` | Server | Primary remote Milvus or Zilliz token override. |
+| `ZILLIZ_URI` | Server | Fallback URI when `MILVUS_URI` is unset. |
+| `ZILLIZ_TOKEN` | Server | Fallback token when `MILVUS_TOKEN` is unset. |
+| `ZILLIZ_API_KEY` | Server | Additional fallback token when `MILVUS_TOKEN` and `ZILLIZ_TOKEN` are unset. |
 | `MFS_METADATA_DSN` | Server | Switches the unified database backend to Postgres and applies the DSN to metadata. |
 | `MFS_TX_CACHE_DSN` | Server | Optional transformation-cache Postgres DSN. |
 | `MFS_TX_CACHE_PG` | Server | Enables Postgres for transformation cache when paired with `MFS_TX_CACHE_DSN` or `MFS_METADATA_DSN`. |
 | `OPENAI_API_KEY` | OpenAI provider SDK | Needed only when the OpenAI-backed (`provider = "openai"`) embedding, summary, or VLM settings are selected. The default ONNX path does not require it. The `openai_compatible` provider does **not** read this env — set its `api_key` under `[summary]`/`[description]` instead (or leave blank for a local unauthenticated endpoint). |
 
-!!! note "`MFS_MILVUS_*` is the preferred runtime override"
-    `MFS_MILVUS_URI` / `MFS_MILVUS_TOKEN` are read by the server and are the
-    only overrides that may carry a Milvus Lite local path - Helm injects them.
-    `MILVUS_URI` / `MILVUS_TOKEN` still work for remote endpoints (pymilvus reads
-    `MILVUS_URI` at import and rejects local paths), and `ZILLIZ_*` remain fallbacks.
+!!! warning "Keep Milvus Lite paths out of `MILVUS_URI`"
+    pymilvus parses `MILVUS_URI` as a remote URI during import and rejects local
+    file paths. For Milvus Lite, leave the variable unset to use
+    `$MFS_HOME/milvus.db`, or set `[milvus].uri` in `server.toml`.
 
 ## CLI Endpoint and Token Resolution
 
@@ -302,8 +299,8 @@ token = "env:MFS_API_TOKEN"
 === "Remote Milvus"
 
     ```bash
-    export MFS_MILVUS_URI="$ZILLIZ_URI"
-    export MFS_MILVUS_TOKEN="$ZILLIZ_TOKEN"
+    export MILVUS_URI="$ZILLIZ_URI"
+    export MILVUS_TOKEN="$ZILLIZ_TOKEN"
     mfs-server run
     ```
 

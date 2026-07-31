@@ -118,8 +118,8 @@ environment variables:
 ```bash
 docker run -d --name mfs-server -p 13619:13619 -v mfs-data:/data \
   -e MFS_API_TOKEN="$MFS_API_TOKEN" \
-  -e ZILLIZ_URI="$ZILLIZ_URI" \
-  -e ZILLIZ_TOKEN="$ZILLIZ_TOKEN" \
+  -e MILVUS_URI="$ZILLIZ_URI" \
+  -e MILVUS_TOKEN="$ZILLIZ_TOKEN" \
   mfs-server
 ```
 
@@ -164,8 +164,11 @@ export MFS_API_TOKEN="$(docker compose -f deployments/compose/docker-compose.yml
 mfs status
 ```
 
-To pin a known token, export `MFS_API_TOKEN` before `up`. The upload rules from
-the Docker section apply unchanged.
+To pin a known API token, export `MFS_API_TOKEN` before `up`. Compose defaults to
+Milvus Lite at `/data/milvus.db`; to use remote Milvus or Zilliz Cloud, uncomment
+the `MILVUS_URI` and `MILVUS_TOKEN` entries in the Compose file and set them to a
+container-reachable HTTP(S) endpoint and its token. The upload rules from the
+Docker section apply unchanged.
 
 ## Kubernetes api/worker
 
@@ -176,7 +179,7 @@ externalized state — Postgres, object storage, and a managed Milvus/Zilliz
 endpoint.
 
 ```bash
-helm lint deployments/helm/mfs
+helm lint deployments/helm/mfs --set search.uri=https://xxx.zillizcloud.com
 helm template mfs deployments/helm/mfs --set search.uri=https://xxx.zillizcloud.com
 ```
 
@@ -237,10 +240,8 @@ The server detects it automatically on the next start — nothing to configure.
 | `MFS_SERVER_CONFIG` | Explicit config-file path, after the `--config` flag. | falls back through `./server.toml`, `$MFS_HOME/server.toml`, `/etc/mfs/server.toml` |
 | `MFS_API_TOKEN` | Server: pin the bearer token. CLI: token for a remote/container server. | server generates `$MFS_HOME/server.token` if unset |
 | `MFS_API_URL` | CLI: point at a non-default endpoint. | `http://127.0.0.1:13619` |
-| `MFS_MILVUS_URI` | Milvus Lite path or a Milvus/Zilliz endpoint (the only override that may carry a Lite path). | `$MFS_HOME/milvus.db` |
-| `MFS_MILVUS_TOKEN` | Milvus/Zilliz token. | empty |
-| `MILVUS_URI` / `MILVUS_TOKEN` | Remote Milvus/Zilliz endpoint + token. pymilvus parses `MILVUS_URI` at import and rejects local paths - use `MFS_MILVUS_URI` for Lite. | unset |
-| `ZILLIZ_URI` / `ZILLIZ_TOKEN` / `ZILLIZ_API_KEY` | Accepted fallbacks for the Zilliz endpoint and token. | used when the `MFS_MILVUS_*` / `MILVUS_*` forms are unset |
+| `MILVUS_URI` / `MILVUS_TOKEN` | Remote Milvus/Zilliz HTTP(S) endpoint and token. Do not put a Milvus Lite file path in `MILVUS_URI`. | unset; Lite resolves to `$MFS_HOME/milvus.db` |
+| `ZILLIZ_URI` / `ZILLIZ_TOKEN` / `ZILLIZ_API_KEY` | Accepted fallbacks for the Zilliz endpoint and token. | used when the `MILVUS_*` form is unset |
 | `OPENAI_API_KEY` | Needed only when an OpenAI-backed embedding/VLM/summary provider is selected. | unused on the default local path |
 | `MFS_METADATA_DSN` | Switch metadata to Postgres. | SQLite under `$MFS_HOME` |
 | `MFS_TX_CACHE_DSN` + `MFS_TX_CACHE_PG` | Put the transformation cache on Postgres. | default backend |

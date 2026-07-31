@@ -1,11 +1,13 @@
 # MFS Docker Compose.
 #
 # v0.4 ships the all-in-one server: API + inline task processing in one container,
-# SQLite metadata + cache on a mounted volume, Milvus via Lite (default) or Zilliz
-# Cloud (set ZILLIZ_URI / ZILLIZ_TOKEN). Single runnable topology today.
+# SQLite metadata + cache on a mounted volume, Milvus via Lite (default) or a
+# remote Milvus/Zilliz endpoint. Single runnable topology today.
 #
-#   ZILLIZ_URI=https://xxx.zillizcloud.com ZILLIZ_TOKEN=... OPENAI_API_KEY=... \
+#   MILVUS_URI=https://xxx.zillizcloud.com MILVUS_TOKEN=... OPENAI_API_KEY=... \
 #     docker compose up --build
+#
+# To use that remote endpoint, uncomment MILVUS_URI and MILVUS_TOKEN below.
 #
 # The api/worker split + Postgres metadata + a shared cache volume is the team /
 # client-server target; the Postgres metadata backend is wired (MFS_METADATA_DSN),
@@ -18,14 +20,14 @@ services:
     image: mfs-server:0.4.5
     command: ["run", "--bind", "0.0.0.0:13619"]
     environment:
-      # Milvus Lite (default): leave ZILLIZ_URI unset -> mfs uses <MFS_HOME>/milvus.db.
-      # Zilliz Cloud / remote Milvus: set ZILLIZ_URI + ZILLIZ_TOKEN. We pass these
-      # directly rather than pymilvus's MILVUS_URI: pymilvus 3.x parses MILVUS_URI at
-      # import time and rejects a local Lite path, so MILVUS_URI must stay remote-only.
-      ZILLIZ_URI: ${ZILLIZ_URI:-}
-      ZILLIZ_TOKEN: ${ZILLIZ_TOKEN:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       MFS_HOME: /data
+      # Milvus Lite is the default at /data/milvus.db. Do not put a Lite file
+      # path in MILVUS_URI because pymilvus treats that variable as a remote URI.
+      # For remote Milvus or Zilliz Cloud, uncomment both lines and use an
+      # HTTP(S) endpoint reachable from this container.
+      # MILVUS_URI: ${MILVUS_URI:?set a remote Milvus or Zilliz endpoint}
+      # MILVUS_TOKEN: ${MILVUS_TOKEN:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       # The API requires a Bearer token. Set MFS_API_TOKEN to a known value
       # so host CLIs can authenticate; if empty the server auto-generates one at
       # /data/server.token (read via: docker compose exec mfs-server cat /data/server.token).
